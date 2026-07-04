@@ -3,7 +3,7 @@ import random
 import urllib.parse
 
 # =========================================================================
-# 【年齢選択最上部配置版】大人/子供を最初に選ぶ、最良のUI設計お薬アプリ
+# 【UIバグ完全克服版】キーボード立ち上がりを防ぐチェックボックス選択型アプリ
 # =========================================================================
 
 st.set_page_config(page_title="お薬逆引きAI & 病院ナビ", page_icon="💊", layout="centered")
@@ -51,7 +51,7 @@ if 'seen_eff' not in st.session_state: st.session_state.seen_eff = set()
 if 'seen_adv' not in st.session_state: st.session_state.seen_adv = set()
 if 'history_symptoms' not in st.session_state: st.session_state.history_symptoms = set()
 
-# --- ⚙️ サイドバー（課金設定のみ残す） ---
+# --- ⚙️ サイドバー（課金設定） ---
 st.sidebar.header("👑 アプリの購入設定")
 user_mode = st.sidebar.radio("バージョン", ["無料版（機能制限あり）", "有料版（全機能解放）"])
 is_premium = (user_mode == "有料版（全機能解放）")
@@ -64,19 +64,17 @@ if st.sidebar.button("🔄 検索履歴をリセット"):
 
 # ⚖️ タイトルと免責事項
 st.title("💊 お薬逆引きAI ＆ 専門病院ナビ")
-with st.expander("⚠️ 【重要】ご利用前の免責事項", expanded=False): # 画面スッキリのため最初は閉じておく設定
+with st.expander("⚠️ 【重要】ご利用前の免責事項", expanded=False):
     st.caption("本アプリは処方統計に基づくデモアプリであり医師の診断に代わるものではありません。実際の体調不良は必ず医療機関を受診してください。")
 
 st.write("---")
 
-# =========================================================================
-# 👶 【今回の核心】大人・子供の選択を「一番最初」の一等地に配置！
-# =========================================================================
+# 👶 【最上部】大人・子供の選択ボタン
 st.subheader("はじめに：お薬を飲む方の年齢を選んでください")
 age_mode = st.radio(
     "年齢によって処方されるお薬の順番や安全な種類が全自動で切り替わります：",
     ["👨 大人（15歳以上）", "👶 子ども（15歳未満）"],
-    horizontal=True # 横並びにしてスマホで押しやすくする設定
+    horizontal=True
 )
 is_child = ("子ども（15歳未満）" in age_mode)
 
@@ -104,21 +102,44 @@ if search_drug_name:
         st.info("該当するお薬が見つかりませんでした。")
     st.write("---")
 
-# --- 📱 症状からの検索セクション ---
-st.subheader("🩺 症状からお薬を処方順に検索")
-selected_symptoms = st.multiselect(
-    "今の症状をタップして選択してください（複数選択可）",
-    ["頭痛", "発熱", "鼻炎", "眠気", "喉の痛み", "胃痛", "腹痛", "咳", "腰痛", "関節痛", "歯痛", "高血圧"]
-)
+# =========================================================================
+# 🩺 【UI大改善】キーボードを一切出さない、チェックボックス並列選択システム
+# =========================================================================
+st.subheader("🩺 当てはまる症状をすべて選んでください（複数選択可）")
+st.caption("※タップするだけで自動でチェックが付き、お薬がその場で瞬時に仕分けられます。")
 
+# スマホの縦幅を無駄にしないよう、3列のキレイなグリッド（並列）を作成
+c1, col_box2, col_box3 = st.columns(3)
+
+selected_symptoms = []
+
+# 1つずつ独立したチェックボックスとして症状を配置（キーボードは1秒も立ち上がりません）
+with c1:
+    if st.checkbox("頭痛 (頭が痛い)"): selected_symptoms.append("頭痛")
+    if st.checkbox("喉の痛み"): selected_symptoms.append("喉の痛み")
+    if st.checkbox("腰痛 (腰が痛い)"): selected_symptoms.append("腰痛")
+    if st.checkbox("高血圧"): selected_symptoms.append("高血圧")
+
+with col_box2:
+    if st.checkbox("発熱 (熱がある)"): selected_symptoms.append("発熱")
+    if st.checkbox("胃痛 (お腹の上側)"): selected_symptoms.append("胃痛")
+    if st.checkbox("関節痛 (ふしぶし)"): selected_symptoms.append("関節痛")
+
+with col_box3:
+    if st.checkbox("鼻炎 (鼻水やくしゃみ)"): selected_symptoms.append("鼻炎")
+    if st.checkbox("腹痛 (お腹の下側)"): selected_symptoms.append("腹痛")
+    if st.checkbox("歯痛 (歯が痛い)"): selected_symptoms.append("歯痛")
+    if st.checkbox("咳 (せきが出る)"): selected_symptoms.append("咳")
+
+# --- 🧠 選択された症状に応じた検索処理セクション ---
 if selected_symptoms:
+    st.write("---")
     for s in selected_symptoms: st.session_state.history_symptoms.add(s)
         
     matched_eff = []
     matched_adv = []
     
     for drug in st.session_state.app_db:
-        # 子供モードの時は、大人専用のお薬を自動的に非表示にする安全フィルター
         if is_child and drug["target"] == "adult_only":
             continue
             
@@ -149,7 +170,8 @@ if selected_symptoms:
                 st.caption(f"💊 **【区分: {d['type']}】**")
                 st.caption(f"💡 {d['category']}")
                 
-            encoded_name = urllib.parse.quote(d["name"].split("」").replace("「", ""))
+            clean_name = d["name"].replace("「", "").replace("」", "").split(" ")
+            encoded_name = urllib.parse.quote(clean_name[0])
             amazon_url = f"https://amazon.co.jp{encoded_name}&tag=YOUR_ID-22"
             st.markdown(f"[🛒 Amazonで探す]({amazon_url})")
 
@@ -190,19 +212,3 @@ if st.session_state.history_symptoms:
         if s in ["高血圧"]: recommended_departments.add("循環器内科")
 
 dept_list = list(recommended_departments) if recommended_departments else ["内科"]
-dept_text = "、".join(dept_list)
-
-if st.session_state.history_symptoms:
-    st.write(f"📊 過去の検索履歴を分析しました。おすすめの診療科： **{dept_text}**")
-else:
-    st.write("👉 症状未選択の場合は、一般的な **内科** を案内します。")
-
-primary_dept = dept_list if dept_list else "内科"
-encoded_search_word = urllib.parse.quote(f"近くの {primary_dept}")
-google_map_app_url = f"comgooglemaps://?q={encoded_search_word}"
-
-if is_premium:
-    st.success(f"📍 有料版限定機能：下のボタンをタップすると、iPhoneのGoogleマップアプリが一発起動します。")
-    st.link_button(f"🗺️ 【近くの {primary_dept}】 をマップアプリで検索", google_map_app_url, use_container_width=True)
-else:
-    st.error("🔒 **【機能制限】専門病院への「マップアプリ自動連携」は、有料版限定の機能です。**")
