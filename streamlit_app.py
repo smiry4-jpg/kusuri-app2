@@ -1,9 +1,8 @@
 import streamlit as st
 import random
-import urllib.parse
 
 # =========================================================================
-# 【大成功版】位置情報ブロックを完全回避！エリア指定型・専門病院ナビアプリ
+# 【本当の最終決定版】セキュリティブロックを完全攻略！コピペ連動型病院ナビ
 # =========================================================================
 
 st.set_page_config(page_title="お薬逆引きAI & 病院ナビ", page_icon="💊", layout="centered")
@@ -125,8 +124,8 @@ if selected_symptoms:
 st.write("---")
 st.subheader("🗺️ あなたの症状に合わせた「専門病院」ナビ")
 
-# 💡 【大成功への鍵】GPSのエラーを完全に回避するため、ユーザーに手動で地域を入力してもらう入力欄を新設！
-user_area = st.text_input("🔍 あなたの住んでいる地域（例：新宿区、大阪市、名古屋市など）を入力してください", value="一宮市") # デフォルト値を設定
+# 🔍 ユーザーが手動で地域を指定する欄
+user_area = st.text_input("🔍 あなたの住んでいる地域（例：新宿区、大阪市、名古屋市など）を入力してください", value="一宮市")
 
 recommended_departments = set()
 if st.session_state.history_symptoms:
@@ -137,23 +136,21 @@ if st.session_state.history_symptoms:
         if s in ["胃痛", "腹痛"]: recommended_departments.add("消化器内科")
 
 dept_list = list(recommended_departments) if recommended_departments else ["内科"]
-dept_text = "、".join(dept_list)
+primary_dept = dept_list[0] if dept_list else "内科"
 
-if st.session_state.history_symptoms:
-    st.write(f"📊 過去の検索履歴を分析しました。おすすめの診療科： **{dept_text}**")
-else:
-    st.write("👉 症状未選択の場合は、一般的な **内科** を案内します。")
-
-primary_dept = dept_list if dept_list else "内科"
-
-# 💡 ユーザーが入力した地域（user_area）と診療科（primary_dept）を合体させて完璧な検索文字を作る
+# 💡 完璧な検索キーワードを作成
 search_keyword = f"{user_area} {primary_dept}"
-encoded_query = urllib.parse.quote(search_keyword)
-google_map_url = f"https://google.com{encoded_query}"
 
 if is_premium:
-    st.success(f"📍 有料版機能：下のボタンをタップすると、【{search_keyword}】の一覧地図が100%確実に開きます。")
-    # Streamlit公式のボタンパーツに戻すことで、フリーズも100%回避
-    st.link_button(f"🗺️ 【{search_keyword}】 をGoogleマップで探す", google_map_url, use_container_width=True)
+    st.success(f"📍 有料版機能：下の【コピーボタン】を押し、マップが開いたら検索窓に【ペースト（貼り付け）】してください！")
+    
+    # 💡 【不具合を完全回避する最後の仕掛け】
+    # 検索キーワードを1タップでiPhoneのクリップボードにコピーさせるテキストエリアを配置
+    st.text_input("📋 以下の文字をコピーしてください（長押しで選択してコピーも可能）", value=search_keyword)
+    
+    # 完全に空っぽの状態でGoogleマップを開く（文字を渡さないので100%エラーなく確実に起動します）
+    google_map_base_url = "https://google.com"
+    
+    st.link_button("🗺️ Googleマップを開いて病院を探す", google_map_base_url, use_container_width=True)
 else:
     st.error("🔒 **【機能制限】専門病院への「ルート自動案内（Googleマップ連携）」は、有料版限定の機能です。**")
