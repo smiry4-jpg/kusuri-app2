@@ -3,7 +3,7 @@ import random
 import urllib.parse
 
 # =========================================================================
-# 【デザインバグ完全克服版】スマホの文字被りを100%解消した、最高操作性のUIアプリ
+# 【最高傑作UI】キーボードが立ち上がらない、スマホ専用横並びチェックボタンアプリ
 # =========================================================================
 
 st.set_page_config(page_title="お薬逆引きAI & 病院ナビ", page_icon="💊", layout="centered")
@@ -20,10 +20,10 @@ if 'app_db' not in st.session_state:
         {"prefix": "カロナイン錠 500mg", "type": "一般薬", "target": "all", "desc": "【大容量解熱鎮痛】大人の頑固な偏頭痛や、風邪による高熱をしっかりとブロックするための大人向け標準サイズです。", "eff": ["頭痛", "発熱", "喉の痛み", "関節痛"], "adv": ["眠気", "食欲不振"], "mg_guide": "●成人の頑固な頭痛・腰痛：1回500mgを服用し、次の服用までは4時間以上あけます。"},
         {"prefix": "カロナイン細粒 20%", "type": "一般薬", "target": "all", "desc": "【乳幼児・小児用シロップ・粉薬】子どもの体重（kg）に合わせて、0.1g単位で医師が正確に量を計算して処方する子ども専用規格です。", "eff": ["頭痛", "発熱", "喉の痛み"], "adv": ["眠気"], "mg_guide": "●子どもの急性発熱：体重1kgあたり1回0.05g〜0.075g（成分として10〜15mg）を計算して服用します。"},
         {"prefix": "ズツウマプロ点鼻液 20mg", "type": "専門薬（脳神経外科）", "target": "adult_only", "desc": "【偏頭痛・トリプタン系発作薬】拡張した脳の血管を直接ピンポイントで収縮させ、激しい偏頭痛の発作を瞬時に止める特殊な鼻スプレーです。", "eff": ["頭痛"], "adv": ["めまい", "喉の不快感", "動悸"], "mg_guide": "●偏頭痛の発作発現時：片方の鼻腔に1回20mgを噴霧します。改善しない場合の追加は2時間以上あけます。"},
-        {"prefix": "ガルペネズ皮下注 120mg", "type": "特殊薬（最先端治療）", "target": "adult_only", "desc": "【偏頭痛・抗体医薬品】月1回の注射で、偏頭痛を引き起こす脳内の原因物質（CGRP）を根元から長期間ブロックする最新の予防注射です。", "eff": ["頭痛"], "adv": ["注射部位の腫れ", "便秘"], "mg_guide": "●偏頭痛の予常管理：月1回、140mg（初回のみ2回分など）を皮下注射することで発作の頻度を激減させます。"},
+        {"prefix": "ガルペネズ皮下注 120mg", "type": "特殊薬（最先端治療）", "target": "adult_only", "desc": "【偏頭痛・抗体医薬品】月1回の注射で、偏頭痛を引き起こす脳内の原因物質（CGRP）を根元から長期間ブロックする最新の予防注射です。", "eff": ["頭痛"], "adv": ["注射部位の腫れ", "便秘"], "mg_guide": "●偏頭痛の予常管理：月1回, 140mg（初回のみ2回分など）を皮下注射することで発作の頻度を激減させます。"},
         {"prefix": "オキシペイン徐放錠 5mg", "type": "特殊薬（麻薬処方箋必須）", "target": "adult_only", "desc": "【強オピオイド・医療用麻薬】一般的な痛み止めが一切効かない、がんの激しい痛み（吐出痛）を脳の神経で直接遮断する強力な医療用麻薬です。", "eff": ["頭痛", "腰痛", "関節痛"], "adv": ["便秘", "吐き気", "強烈な眠気"], "mg_guide": "●がん性疼痛の持続緩和：1回5mgから開始し、痛みの強さに応じて段階的に増量が検討される特殊な用量設計です。"},
-        {"prefix": "スピロペント錠 10mcg", "type": "専門薬（呼吸器内科）", "target": "all", "desc": "【気管支拡張薬】気管支の筋肉を強力にゆるめて空気の通り道を広げ、止まらない喘息の激しい咳を劇的に楽にする専門薬です。", "eff": ["咳"], "adv": ["手の震え", "動悸", "頭痛"], "mg_guide": "●喘息の咳・腹圧性尿失禁：成人は1日2回、1回10mcg（マイクログラム）を朝・就寝前に服用します。"},
-        {"prefix": "ネムラール錠 15mg", "type": "専門薬（精神神経科）", "target": "adult_only", "desc": "【オレキシン受容体拮開薬】脳の『覚醒スイッチ』を強制的にオフにすることで、依存性が極めて低く自然な睡眠をもたらす新世代の催眠薬です。", "eff": ["眠気"], "adv": ["翌朝のだるさ", "悪夢", "頭痛"], "mg_guide": "●不眠症の改善：1回15mgを就寝の直前に服用します。高齢者の場合は1回10mgに減量されるケースがあります。"}
+        {"prefix": "スピロペント錠 10mcg", "type": "専門薬（呼吸器内科）", "target": "all", "desc": "【気管支拡張薬】気管支の筋肉を強力にゆるめて空気の通り道を広げ、止まらない喘息の激しい咳を劇的に楽にする専門薬です。", "eff": ["咳"], "adv": ["手の震え", "動悸", "頭痛"], "mg_guide": "●喘息の咳・腹圧性尿失禁：成人は1日2回, 1回10mcg（マイクログラム）を朝・就寝前に服用します。"},
+        {"prefix": "ネムラール錠 15mg", "type": "専門薬（精神神経科）", "target": "adult_only", "desc": "【オレキシン受容体拮抗薬】脳の『覚醒スイッチ』を強制的にオフにすることで、依存性が極めて低く自然な睡眠をもたらす新世代の催眠薬です。", "eff": ["眠気"], "adv": ["翌朝のだるさ", "悪夢", "頭痛"], "mg_guide": "●不眠症の改善：1回15mgを就寝の直前に服用します。高齢者の場合は1回10mgに減量されるケースがあります。"}
     ]
     
     for rank in range(1, 2001):
@@ -72,7 +72,7 @@ with st.expander("⚠️ 【重要】ご利用前の免責事項", expanded=Fals
 st.write("---")
 
 # =========================================================================
-# 🗂️ 【UI改善：第1段】一番上に「年齢選択」を配置
+# 👨‍⚕️ 【最上部】年齢の選択ボタン
 # =========================================================================
 st.subheader("はじめに：お薬を飲む方の年齢を選んでください")
 age_mode = st.radio(
@@ -85,23 +85,25 @@ is_child = ("子ども（15歳未満）" in age_mode)
 st.write("---")
 
 # =========================================================================
-# 🗂️ 【UI改善：第2段】メイン機能の「症状から処方順に検索」を特等席へ配置
+# 🎛️ 【大復活】キーボードが絶対に立ち上がらない「2列配置のチェックボタン」
 # =========================================================================
-st.subheader("🩺 症状からお薬を処方順に検索")
-selected_symptoms = st.multiselect(
-    "今のあなたの症状をタップして選択してください（複数選択可）",
-    ["頭痛", "発熱", "鼻炎", "眠気", "喉の痛み", "胃痛", "腹痛", "咳", "腰痛", "関節痛", "歯痛", "高血圧"]
-)
+st.subheader("🩺 今のあなたの症状にチェックを入れてください（複数選択可）")
 
-# 💡 症状が選ばれたときに文字被りを防ぐための「透明なクッション用余白（防護壁）」を設置！
-# これにより、メニューを開いても下の文字と100%被らなくなります。
-if not selected_symptoms:
-    st.write("")
-    st.write("")
-    st.write("")
-    st.write("")
+# スマホ画面を左右に2分割して、チェックボタンを綺麗に横並びにするUI
+symptom_cols = st.columns(2)
+selected_symptoms = []
 
-# 症状変更の瞬間に一撃自動リロード
+all_available_symptoms = ["頭痛", "発熱", "鼻炎", "眠気", "喉の痛み", "胃痛", "腹痛", "咳", "腰痛", "関節痛", "歯痛", "高血圧"]
+
+for idx, symptom in enumerate(all_available_symptoms):
+    # 偶数番目と奇数番目で左右の列に綺麗に振り分ける
+    target_col = symptom_cols[idx % 2]
+    with target_col:
+        # 💡 ここが本物のチェックボックスです。指でポンと押すだけで、文字入力は1秒も立ち上がりません。
+        if st.checkbox(symptom, key=f"check_{symptom}"):
+            selected_symptoms.append(symptom)
+
+# 💡 症状の変更（タップ）を検知した瞬間に、古い履歴を裏側で全自動クリアして1秒リロード！
 if selected_symptoms != st.session_state.last_selected_symptoms:
     st.session_state.seen_eff = set()
     st.session_state.seen_adv = set()
@@ -111,7 +113,7 @@ if selected_symptoms != st.session_state.last_selected_symptoms:
     st.session_state.last_selected_symptoms = selected_symptoms
     st.rerun()
 
-# 🧠 お薬の掛け算・スキャンロジック
+# 🧠 お薬スキャン＆ソート処理
 if selected_symptoms:
     for s in selected_symptoms: st.session_state.history_symptoms.add(s)
         
@@ -138,7 +140,8 @@ if selected_symptoms:
     filtered_adv = [item for item in matched_adv if item["data"]["name"] not in shown_eff_names]
     adv_show = filtered_adv[:3]
     
-    # 💻 カード結果出力
+    # 💻 結果出力
+    st.write("---")
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("🔵 効率よく『同時に治せる』お薬")
@@ -189,5 +192,3 @@ if selected_symptoms:
             if len(matched_eff) > 3 or len(filtered_adv) > 3:
                 if st.button("⏭️ 次の3件のお薬をめくる", use_container_width=True):
                     st.session_state.eff_history_stack.append([item["data"]["name"] for item in eff_show])
-                    st.session_state.adv_history_stack.append([item["data"]["name"] for item in adv_show])
-                    for item in eff_show: st.session_state.seen_eff.add(item["data"]["name"])
