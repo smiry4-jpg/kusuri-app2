@@ -3,7 +3,7 @@ import random
 import urllib.parse
 
 # =========================================================================
-# 【真の完成版】iPhoneのマップアプリを強制起動・文字自動入力連携システム
+# 【完全完成版】「次へめくるボタン」搭載 ＆ マップアプリ全自動連携アプリ
 # =========================================================================
 
 st.set_page_config(page_title="お薬逆引きAI & 病院ナビ", page_icon="💊", layout="centered")
@@ -27,9 +27,14 @@ if 'app_db' not in st.session_state:
         "セキドメミン": "【咳止め】脳の咳スイッチを鎮めて、止まらない激しい咳を楽にする薬"
     }
     
+    # 1位から完璧な連番でお薬を格付け
     for rank in range(1, 1001):
-        eff = ["頭痛", "発熱"] if rank <= 50 else random.sample(symptom_pool, 2)
-        adv = ["眠気", "胃痛"] if rank <= 50 else random.sample(side_effect_pool, 2)
+        if rank <= 200:
+            eff = ["頭痛", "発熱", "鼻炎", "眠気", "喉の痛み"]
+            adv = ["眠気", "頭痛", "胃痛", "吐き気"]
+        else:
+            eff = random.sample(symptom_pool, 2)
+            adv = random.sample(side_effect_pool, 2)
         prefix = random.choice(brand_prefixes)
         temp_db.append({
             "name": f"「{prefix}{random.choice(brand_suffixes)}」",
@@ -39,6 +44,7 @@ if 'app_db' not in st.session_state:
         })
     st.session_state.app_db = temp_db
 
+# 履歴メモリ
 if 'seen_eff' not in st.session_state: st.session_state.seen_eff = set()
 if 'seen_adv' not in st.session_state: st.session_state.seen_adv = set()
 if 'history_symptoms' not in st.session_state: st.session_state.history_symptoms = set()
@@ -51,11 +57,12 @@ user_mode = st.sidebar.radio(
 )
 is_premium = (user_mode == "有料版を購入（480円・全機能解放）")
 
-if st.sidebar.button("🔄 検索履歴をリセットする"):
+# 🔄 履歴リセットボタン（最初からやり直す）
+if st.sidebar.button("🔄 検索履歴を完全にリセット"):
     st.session_state.seen_eff = set()
     st.session_state.seen_adv = set()
     st.session_state.history_symptoms = set()
-    st.sidebar.success("記憶をクリアしました！")
+    st.sidebar.success("履歴をクリアしました！1位から再表示されます。")
 
 # ⚖️ 免責事項の表示
 st.title("💊 お薬逆引きAI ＆ 専門病院ナビ")
@@ -74,6 +81,7 @@ if selected_symptoms:
     matched_eff = []
     matched_adv = []
     
+    # データベースのスキャン（過去に見たものは自動で除外されるフィルター）
     for drug in st.session_state.app_db:
         if keyword_count := sum(1 for s in selected_symptoms if s in drug["efficacy"]):
             if drug["name"] not in st.session_state.seen_eff:
@@ -85,14 +93,15 @@ if selected_symptoms:
     matched_eff.sort(key=lambda x: (-x["count"], x["data"]["rank"]))
     matched_adv.sort(key=lambda x: (-x["count"], x["data"]["rank"]))
     
+    # 今回表示する3件を切り出し
     eff_show = matched_eff[:3]
     shown_eff_names = [item["data"]["name"] for item in eff_show]
     filtered_adv = [item for item in matched_adv if item["data"]["name"] not in shown_eff_names]
     adv_show = filtered_adv[:3]
     
-    for item in eff_show: st.session_state.seen_eff.add(item["data"]["name"])
-    for item in adv_show: st.session_state.seen_adv.add(item["data"]["name"])
+    # 💡 【重要】「次へボタン」が押されたタイミングで履歴に保存されるようにするため、ここではまだ仮保存（表示のみ）にします
     
+    # 画面出力
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("🔵 効率よく『同時に治せる』お薬")
@@ -116,10 +125,23 @@ if selected_symptoms:
             if is_premium: st.caption(f"💡 {d['category']}")
 
     st.write("---")
+    
+    # =========================================================================
+    # 🎛️ 【仕掛け】2回目以降の検索（続きをめくる）を実現する「次へボタン」アルゴリズム
+    # =========================================================================
     if not is_premium:
+        # 🆓 無料版：続きをめくろうとするとロック画面を表示
         st.error("🔒 **【機能制限】これより下位（4位以降）のお薬は、無料版では非表示になっています。**")
+        st.caption("サイドバーから【有料版（480円）】を購入すると、制限が解除され、下の『次のお薬をめくる』ボタンが出現して無限に閲覧できるようになります。")
     else:
-        st.success(f"🔓 **有料版：全機能解放中**（現在までに累計 効能:{len(st.session_state.seen_eff)}件 / 副作用:{len(st.session_state.seen_adv)}件 を精査済）")
+        # 👑 有料版：次のお薬へ進むための本物のボタンを配置！
+        st.success(f"🔓 **有料版：全機能解放中**（現在までに累計 効能:{len(st.session_state.seen_eff)}件 / 副作用:{len(st.session_state.seen_adv)}件 を除外済）")
+        
+        # ボタンが押されたら、今見ているお薬を「除外履歴」に正式に登録して、画面を再起動（リロード）させる
+        if st.button("⏭️ 次の3件のお薬をめくる（4位以降を表示）", use_container_width=True):
+            for item in eff_show: st.session_state.seen_eff.add(item["data"]["name"])
+            for item in adv_show: st.session_state.seen_adv.add(item["data"]["name"])
+            st.rerun() # 👈 これにより、今見たお薬が完全に引き算され、次の3件が押し出されます！
 
 # --- 🏥 病院検索セクション ---
 st.write("---")
@@ -142,18 +164,11 @@ else:
     st.write("👉 症状未選択の場合は、一般的な **内科** を案内します。")
 
 primary_dept = dept_list if dept_list else "内科"
-
-# 💡 【真のバグ完全解決：iPhoneのマップ専用アプリ自動入力アドレス（comgooglemaps規格）】
-# 日本語の文字化けを防ぐエンコード処理
 encoded_search_word = urllib.parse.quote(f"近くの {primary_dept}")
-
-# iPhoneに最初から入っている「Googleマップアプリ」へ、直接キーワードを自動入力した状態で強制起動させる世界共通の専用命令です。
-# これにより、空っぽのWebサイトが開くバグを100%回避し、スマホのアプリが文字が入力された状態で一撃で立ち上がります。
 google_map_app_url = f"comgooglemaps://?q={encoded_search_word}"
 
 if is_premium:
     st.success(f"📍 有料版限定機能：下のボタンをタップすると、iPhoneのGoogleマップアプリが【自動で文字が入力された状態】で一発起動します。")
-    # Streamlit公式のボタン部品に載せることで、安全にアプリを呼び出します
     st.link_button(f"🗺️ 【近くの {primary_dept}】 をマップアプリで検索", google_map_app_url, use_container_width=True)
 else:
     st.error("🔒 **【機能制限】専門病院への「マップアプリ自動連携」は、有料版限定の機能です。**")
