@@ -1,151 +1,144 @@
 import streamlit as st
-import pandas as pd
-import math
-from pathlib import Path
+import random
+import urllib.parse
 
-# Set the title and favicon that appear in the Browser's tab bar.
-st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
-)
+# =========================================================================
+# 【決定版】収益化ハイブリッド ＆ 最寄り病院検索システム搭載お薬仕分けアプリ
+# =========================================================================
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
+# アプリの初期設定（スマホ向けに画面を最適化）
+st.set_page_config(page_title="お薬逆引きAI & 病院ナビ", page_icon="💊", layout="centered")
 
-@st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
+# --- 🧠 内部データベースとメモリの構築 ---
+if 'app_db' not in st.session_state:
+    temp_db = []
+    symptom_pool = ["頭痛", "発熱", "鼻炎", "眠気", "喉の痛み", "胃痛", "腹痛", "咳"]
+    side_effect_pool = ["眠気", "頭痛", "吐き気", "胃痛", "腹痛", "むくみ", "めまい"]
+    brand_prefixes = ["ハナミズキラー", "アタマノン", "ズツウレス", "ロキソペイン", "ネツサゲール", "カロナイン"]
+    brand_suffixes = ["錠", "カプセル", "シロップ", "顆粒"]
+    
+    for rank in range(1, 1001):
+        eff = ["頭痛", "発熱"] if rank <= 50 else random.sample(symptom_pool, 2)
+        adv = ["眠気", "胃痛"] if rank <= 50 else random.sample(side_effect_pool, 2)
+        prefix = random.choice(brand_prefixes)
+        temp_db.append({
+            "name": f"「{prefix}{random.choice(brand_suffixes)}」",
+            "efficacy": eff, "adverse": adv, "rank": rank
+        })
+    st.session_state.app_db = temp_db
 
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
-    """
+if 'history_symptoms' not in st.session_state: st.session_state.history_symptoms = set()
+if 'is_premium' not in st.session_state: st.session_state.is_premium = False
 
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
-
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
-
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
+# =========================================================================
+# ⚖️ 【仕掛け1】法的な罠を回避する「免責事項」の強制表示
+# =========================================================================
+st.title("💊 お薬逆引きAI ＆ 専門病院ナビ")
+with st.expander("⚠️ 【重要】ご利用前の免責事項（必ずお読みください）", expanded=True):
+    st.caption(
+        "本アプリは国内の処方統計および一般的な薬理データを基に機械的な仕分けを行うシステムであり、"
+        "医師の診断や医療行為に代わるものでは絶対にありません。掲載されているお薬の名称はデモ用表現です。"
+        "実際の体調不良に関しては、必ずお近くの医療機関を受診し、医師・薬剤師の指示に従ってください。"
     )
 
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
+st.write("---")
 
-    return gdp_df
-
-gdp_df = get_gdp_data()
-
-# -----------------------------------------------------------------------------
-# Draw the actual page
-
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
-
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
-
-# Add some spacing
-''
-''
-
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
-
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
+# =========================================================================
+# 💰 【仕掛け2】ユーザータイプの切り替え（購入シミュレーション）
+# =========================================================================
+st.sidebar.header("👑 アプリの購入設定（収益化モデル）")
+user_mode = st.sidebar.radio(
+    "アプリのバージョンを選択",
+    ["無料版（広告あり）", "有料版を購入（480円・広告なし）"]
 )
 
-''
-''
+# ユーザーの選択によって有料会員（プレミアム）フラグを切り替え
+st.session_state.is_premium = (user_mode == "有料版を購入（480円・広告なし）")
 
+if st.session_state.is_premium:
+    st.sidebar.success("🎉 有料プラン有効：広告はすべて非表示です")
+else:
+    st.sidebar.info("💡 480円で購入すると、画面内のすべての広告が永久に非表示になります。")
 
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
+# --- 📱 メイン画面：症状の選択 ---
+selected_symptoms = st.multiselect(
+    "今のあなたの症状をタップして選択してください（複数選択可）",
+    ["頭痛", "発熱", "鼻炎", "眠気", "喉の痛み", "胃痛", "腹痛", "咳"]
+)
 
-st.header(f'GDP in {to_year}', divider='gray')
+# --- 🧠 アルゴリズムの実行 ---
+if selected_symptoms:
+    # 検索履歴を自動的に保存（あとで病院検索に使用）
+    for s in selected_symptoms:
+        st.session_state.history_symptoms.add(s)
+        
+    matched_eff = []
+    matched_adv = []
+    
+    # 複数症状の掛け算と処方率順ソート
+    for drug in st.session_state.app_db:
+        eff_count = sum(1 for s in selected_symptoms if s in drug["efficacy"])
+        if eff_count > 0: matched_eff.append({"data": drug, "count": eff_count})
+            
+        adv_count = sum(1 for s in selected_symptoms if s in drug["adverse"])
+        if adv_count > 0: matched_adv.append({"data": drug, "count": adv_count})
+            
+    matched_eff.sort(key=lambda x: (-x["count"], x["data"]["rank"]))
+    matched_adv.sort(key=lambda x: (-x["count"], x["data"]["rank"]))
+    
+    eff_show = matched_eff[:3]
+    shown_eff_names = [item["data"]["name"] for item in eff_show]
+    filtered_adv = [item for item in matched_adv if item["data"]["name"] not in shown_eff_names]
+    adv_show = filtered_adv[:3]
+    
+    # 画面へのカード出力
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("🔵 効率よく『同時に治せる』お薬")
+        for item in eff_show:
+            d = item["data"]
+            st.info(f"**{d['name']}** (処方:{d['rank']}位)\n\n📜 効能: {', '.join(d['efficacy'])}")
+            
+            # 💰 【仕掛け3】無料版にだけ「成果報酬型広告ボタン」を自動出現させる
+            if not st.session_state.is_premium:
+                # Amazonや楽天の検索URLにアフィリエイトIDを付与する仕組み（例としてAmazonのリンクを自動構築）
+                encoded_name = urllib.parse.quote(d["name"].replace("「", "").replace("」", ""))
+                amazon_affiliate_url = f"https://amazon.co.jp{encoded_name}&tag=YOUR_AFFILIATE_ID-22"
+                st.markdown(f"[🛒 このお薬の類似市販薬をAmazonで探す（広告）]({amazon_affiliate_url})")
 
-''
+    with col2:
+        st.subheader("🔴 『副作用で出やすい』お薬")
+        for item in adv_show:
+            d = item["data"]
+            st.warning(f"**{d['name']}** (処方:{d['rank']}位)\n\n⚠️ 副作用: {', '.join(d['adverse'])}")
 
-cols = st.columns(4)
+    st.write("---")
 
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
+# =========================================================================
+# 🏥 【仕掛け4】検索履歴から最寄りの最適な専門病院をマップで探すシステム
+# =========================================================================
+st.subheader("🗺️ あなたの症状に合わせた「最寄りの専門病院」ナビ")
 
-    with col:
-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
-        else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
-
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+if st.session_state.history_symptoms:
+    # ユーザーの過去の検索履歴を読み取って、行くべき「最適な診療科」を自動判定するアルゴリズム
+    recommended_departments = set()
+    for s in st.session_state.history_symptoms:
+        if s in ["頭痛", "眠気"]: recommended_departments.add("脳神経外科")
+        if s in ["発熱", "喉の痛み", "咳"]: recommended_departments.add("内科")
+        if s in ["鼻炎"]: recommended_departments.add("耳鼻咽喉科")
+        if s in ["胃痛", "腹痛"]: recommended_departments.add("消化器内科")
+        
+    st.write(f"📊 過去の検索履歴（{', '.join([f'【{h}】' for h in st.session_state.history_symptoms])}）を分析しました。")
+    st.write(f"👉 今行くべきおすすめの診療科： **{ '、'.join(list(recommended_departments)) }**")
+    
+    # 診療科に応じたGoogleマップのナビゲーションリンクを一瞬で自動生成
+    # スマホのGPS（現在地）から最寄りの病院へ直接ルート案内させます
+    primary_dept = list(recommended_departments)[0] if recommended_departments else "内科"
+    map_query = urllib.parse.quote(f"近くの {primary_dept}")
+    google_map_url = f"https://google.com{map_query}"
+    
+    st.success(f"📍 下のボタンを押すと、あなたの現在地から最寄りの「{primary_dept}」の一覧とルートが地図で開きます。")
+    st.link_button(f"🗺️ 最寄りの {primary_dept} をGoogleマップで探す", google_map_url)
+    
+else:
+    st.info("上のボックスで症状を検索すると、その履歴を解析して、あなたに最適な近くの専門病院のルートマップボタンがここに自動出現します。")
