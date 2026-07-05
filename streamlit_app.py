@@ -2,7 +2,7 @@ import streamlit as st
 import urllib.parse
 
 # =========================================================================
-# 【厳密データ細分化＆要件完全合致版】お薬逆引きAI & 病院ナビ (追加修正版)
+# 【有料無料切り替えバグ完全修正版】お薬逆引きAI & 病院ナビ (追加修正版)
 # =========================================================================
 
 st.set_page_config(page_title="お薬逆引きAI & 病院ナビ", page_icon="💊", layout="wide")
@@ -45,9 +45,27 @@ if st.session_state.user_target is None:
 
 is_child = (st.session_state.user_target == "child")
 
-# --- 🧠 3. 【mg・剤形 厳密細分化版】本物のマスターデータベース ---
+# --- ⚙️ 3. 【最優先修正】サイドバーの有料・無料切り替え判定 ---
+# データベース構築より前に判定を置くことで、すべての表示に即時反映させます
+st.sidebar.header("🛠️ システム設定")
+
+if 'saved_premium_status' not in st.session_state:
+    st.session_state.saved_premium_status = "有料版（全機能解放）"
+
+# ラジオボタンの選択肢を現在のセッション状態から初期化
+current_index = 0 if st.session_state.saved_premium_status == "無料版" else 1
+user_mode = st.sidebar.radio("バージョン選択", ["無料版", "有料版（全機能解放）"], index=current_index)
+
+# 選択が切り替わったらセッションを更新して即座に再描画（リロード）
+if user_mode != st.session_state.saved_premium_status:
+    st.session_state.saved_premium_status = user_mode
+    st.rerun()
+
+is_premium = (st.session_state.saved_premium_status == "有料版（全機能解放）")
+
+
+# --- 🧠 4. 【mg・剤形 厳密細分化版】本物のマスターデータベース ---
 if 'app_db' not in st.session_state:
-    # 扱うものがお薬であるため、mg数や形状（錠・細粒など）が違うものは全て別IDで細分化管理
     st.session_state.app_db = [
         # --- 大人用：カロナール（mg数・使用条件で分離） ---
         {
@@ -79,7 +97,7 @@ if 'app_db' not in st.session_state:
             "name": "カロナール錠 500mg（成分: アセトアミノフェン）",
             "rank": 3,
             "target": "adult_only",
-            "efficacy": ["頭痛", "喉の痛み"], # 高用量のため強い痛み（頭痛・のど痛）を主目的
+            "efficacy": ["頭痛", "喉の痛み"],
             "adverse": ["吐き気"],
             "effect_detail": "1錠中の成分量が多いため、通常の熱・痛み止めでは緩和しにくい、激しい偏頭痛や、のどの酷い炎症による痛みをしっかり遮断します。",
             "adverse_detail": "高用量のため、一度に飲むと胃のムカムカ感や吐き気が出やすくなります。また肝臓への影響を防ぐため、1日の上限量を厳守する必要があります。",
@@ -128,7 +146,7 @@ if 'app_db' not in st.session_state:
             "name": "ムコダイン錠 250mg（成分: カルボシステイン）",
             "rank": 7,
             "target": "adult_only",
-            "efficacy": ["鼻炎"], # 軽度な鼻水・排膿
+            "efficacy": ["鼻炎"],
             "adverse": ["胃痛"],
             "effect_detail": "鼻の奥につまったドロドロした粘り気のある鼻水をサラサラに変え、体外へ排出しやすくして副鼻腔の不快感を改善します。",
             "adverse_detail": "きわめて安全ですが、胃の弱い方では稀に軽い胃の不快感や胃痛を覚えることがあります。",
@@ -140,15 +158,14 @@ if 'app_db' not in st.session_state:
             "name": "ムコダイン錠 500mg（成分: カルボシステイン）",
             "rank": 8,
             "target": "adult_only",
-            "efficacy": ["咳", "喉の痛み"], # 痰が絡む咳、のどの炎症排膿
+            "efficacy": ["咳", "喉の痛み"],
             "adverse": ["腹痛"],
             "effect_detail": "喉や気管支にべったりと張り付いて離れないしつこい痰（たん）を分解して流動化し、咳と一緒にスムーズに吐き出せるようにします。",
             "adverse_detail": "成分量が多い規格のため、腸内環境にわずかに影響し、稀に軽い腹痛や軟便を引き起こすことがあります。",
             "hospitalType": "呼吸器内科",
             "category": "【気道粘液調整薬】気管支炎など、痰が絡んで喉が痛む咳に処方される標準的な500mg規格です。"
         },
-        
-        # --- 子供用：細粒・ドライシロップ・シロップ（mg数・年齢条件で厳密に完全分離） ---
+        # --- 子供用：細粒・ドライシロップ・シロップ ---
         {
             "id": "C001-20", 
             "name": "小児用カロナール細粒 20%（成分: アセトアミノフェン）",
@@ -166,7 +183,7 @@ if 'app_db' not in st.session_state:
             "name": "カロナールシロップ 2%（成分: アセトアミノフェン）",
             "rank": 2,
             "target": "child_only",
-            "efficacy": ["発熱"], # シロップは主に乳幼児の突発的な発熱に使用
+            "efficacy": ["発熱"],
             "adverse": ["吐き気"],
             "effect_detail": "粉薬をまだ上手に飲み込むことができない、ごく小さなお子さまや赤ちゃん（乳幼児）の発熱を優しく下げるための液体のお薬です。",
             "adverse_detail": "甘い味がついていて飲みやすいですが、嫌がって一度に大量に誤飲すると危険です。服用後に吐き気などの副反応が出ないか様子を見てあげてください。",
@@ -203,9 +220,6 @@ if 'app_db' not in st.session_state:
 if 'current_page' not in st.session_state: st.session_state.current_page = 0
 if 'last_selected_symptoms' not in st.session_state: st.session_state.last_selected_symptoms = []
 if 'last_search_query' not in st.session_state: st.session_state.last_search_query = ""
-if 'saved_premium_status' not in st.session_state: st.session_state.saved_premium_status = "有料版（全機能解放）"
-
-is_premium = (st.session_state.saved_premium_status == "有料版（全機能解放）")
 
 # --- 🖥️ メイン画面の表示エリア ---
 st.title("💊 お薬逆引きAI & 病院ナビ")
@@ -233,16 +247,3 @@ if selected_symptoms != st.session_state.last_selected_symptoms or search_query 
     st.session_state.last_search_query = search_query
     st.rerun()
 
-# --- 🔍 データ抽出・ソート・2列出力ロジック ---
-if selected_symptoms or search_query:
-    matched_eff = []
-    matched_adv = []
-    
-    # 厳密な細分化に基づき、管理ID(id)ベースでの重複を厳格に管理
-    seen_ids_eff = set()
-    seen_ids_adv = set()
-    
-    for drug in st.session_state.app_db:
-        # 【対象の区別】大人用/子供用
-        if is_child and drug["target"] == "adult_only":
-            continue
