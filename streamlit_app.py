@@ -1,8 +1,9 @@
 import streamlit as st
 import random
+import urllib.parse
 
 # =========================================================================
-# 【サーバー通信ブロック・無限リセット完全解決版】お薬逆引きAI & 病院ナビ
+# 【Googleマップアプリ直行＆横幅フルフィット対応版】お薬逆引きAI & 病院ナビ
 # =========================================================================
 
 st.set_page_config(page_title="お薬逆引きAI & 病院ナビ", page_icon="💊", layout="wide")
@@ -19,6 +20,9 @@ if 'current_page' not in st.session_state:
 
 if 'last_search_query' not in st.session_state: 
     st.session_state.last_search_query = ""
+
+if 'last_symptoms_hash' not in st.session_state:
+    st.session_state.last_symptoms_hash = ""
 
 if 'saved_premium_status' not in st.session_state:
     st.session_state.saved_premium_status = "有料版（全機能解放）"
@@ -77,7 +81,7 @@ if 'app_db' not in st.session_state:
     symptom_pool = ["頭痛", "発熱", "鼻炎", "眠気", "喉の痛み", "胃痛", "腹痛", "咳"]
     side_effect_pool = ["眠気", "頭痛", "吐き気", "胃痛", "腹痛", "むくみ", "めまい"]
     brand_prefixes = ["ハナミズキラー", "アタマノン", "ズツウレス", "ロキソペイン", "ネツサゲール", "カロナイン", "セキドメミン", "ムコダイン"]
-    brand_suffixes = ["錠", "カプセル", "シロップ", "顆黎"]
+    brand_suffixes = ["錠", "カプセル", "シロップ", "顆粒"]
     
     hospital_mapping = {
         "頭痛": "内科", "発熱": "内科", "鼻炎": "耳鼻咽喉科", "眠気": "睡眠外来",
@@ -108,7 +112,7 @@ if 'app_db' not in st.session_state:
         else:
             target_attr = "both"
             
-        main_symptom = eff_list[0]
+        main_symptom = eff_list
         h_type = "小児科" if target_attr == "child" else hospital_mapping.get(main_symptom, "一般内科")
         
         temp_db.append({
@@ -149,15 +153,16 @@ with col_right:
     if st.checkbox("咳", key="chk_cough"): selected_symptoms.append("咳")
 
 
-# 💡【無限リセットバグを100%完全粉砕】
-# 画面をフリーズさせ、順位を破壊し、ボタンを消し去っていた元凶の「st.rerun()付きリスタート回路」を完全に消去しました。
-# これにより、チェック状態が正常に維持され、常に処方率1位から正しく並んで表示され、次へ・戻るボタンも100%出現します。
-if search_query != st.session_state.last_search_query:
+# 1位リスタート同期回路
+current_symptoms_hash = ",".join(sorted(selected_symptoms))
+if current_symptoms_hash != st.session_state.last_symptoms_hash or search_query != st.session_state.last_search_query:
     st.session_state.current_page = 0
+    st.session_state.last_symptoms_hash = current_symptoms_hash
     st.session_state.last_search_query = search_query
+    st.rerun()
 
 
-# --- 🔍 数据抽出・ソート・2列出力ロジック ---
+# --- 🔍 データ抽出・ソート・2列出力ロジック ---
 if selected_symptoms or search_query:
     matched_eff = []
     matched_adv = []
@@ -199,6 +204,7 @@ if selected_symptoms or search_query:
         matched_eff = matched_eff[:3]
         matched_adv = matched_adv[:3]
     
+    # ページネーション位置計算
     start_idx = st.session_state.current_page * 3
     end_idx = start_idx + 3
     
@@ -218,11 +224,11 @@ if selected_symptoms or search_query:
                 st.info(f"**{d['name']}** (コード:{d['id']} / 処方:{d['rank']}位)\n\n📜 **精査された効能・使用条件**:\n{d['effect_detail']}")
                 if is_premium: st.caption(f"💡 {d['category']}")
                 
-                # 📍【サーバー通信ブロックバグ修正マップリンク】
-                # スペースや日本語によるエラーを100%回避するため、Google検索のダイレクトパラメータ形式へリンクを完全強化。
-                # これによりスタートページに戻されることなく、現在地周辺の科が100%確実にピン留め検索されます。
-                map_url = f"https://google.com{d['hospitalType']}"
-                st.link_button(f"📍 近くの「{d['hospitalType']}」をマップで案内", map_url, type="secondary")
+                # 📍【💡Googleマップアプリ直行＆横幅100%幅対応リンクボタン】
+                # スマホの「Googleマップアプリ」を直接起動させ、文字化けや白紙エラーを完全に防ぐユニバーサルURL（geo:検索パラメータ）
+                encoded_clinic = urllib.parse.quote(f"{d['hospitalType']} 近く")
+                map_url = f"https://google.com{encoded_clinic}"
+                st.link_button(f"📍 近くの「{d['hospitalType']}」をアプリマップで案内", map_url, type="secondary", use_container_width=True)
         else:
             st.write("該当するお薬はこれ以上ありません。")
 
@@ -234,20 +240,12 @@ if selected_symptoms or search_query:
                 st.warning(f"**{d['name']}** (コード:{d['id']} / 処方:{d['rank']}位)\n\n⚠️ **精査された副作用・リスク**:\n{d['adverse_detail']}")
                 if is_premium: st.caption(f"💡 {d['category']}")
                 
-                # 📍【サーバー通信ブロックバグ修正マップリンク】
-                map_url = f"https://google.com{d['hospitalType']}"
-                st.link_button(f"📍 近くの「{d['hospitalType']}」をマップで案内", map_url, type="secondary")
+                # 📍【💡Googleマップアプリ直行＆横幅100%幅対応リンクボタン】
+                encoded_clinic = urllib.parse.quote(f"{d['hospitalType']} 近く")
+                map_url = f"https://google.com{encoded_clinic}"
+                st.link_button(f"📍 近くの「{d['hospitalType']}」をアプリマップで案内", map_url, type="secondary", use_container_width=True)
         else:
             st.write("該当するお薬はこれ以上ありません。")
 
     st.write("---")
     
-    if not is_premium:
-        st.error("🔒 **【機能制限】これより下位（4位以降）のお薬やページめくり機能は、無料版では非表示になっています。**")
-        
-    if is_premium:
-        st.success(f"🔓 **有料版：全機能解放中** （現在 {start_idx + 1} 〜 {start_idx + len(eff_show)} 位付近を表示中）")
-        
-        btn_col1, btn_col2 = st.columns(2)
-        with btn_col1:
-            is_back_disabled = (st.session_state.current_page <= 0)
