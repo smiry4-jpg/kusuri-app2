@@ -3,7 +3,7 @@ import random
 import urllib.parse
 
 # =========================================================================
-# 【完全解放・大成功版】課金ロックを全撤廃！すべての神機能が最初から100%出現するアプリ
+# 【正真正銘の最終決定版】すべての成功機能を完全にドッキングした最高峰アプリ
 # =========================================================================
 
 st.set_page_config(page_title="お薬逆引きAI & 病院ナビ", page_icon="💊", layout="centered")
@@ -57,6 +57,19 @@ if 'last_selected_symptoms' not in st.session_state: st.session_state.last_selec
 if 'current_page' not in st.session_state: st.session_state.current_page = 0
 if 'last_age_mode' not in st.session_state: st.session_state.last_age_mode = "👨 大人（15歳以上）"
 
+# 有料版状態の永続記憶メモリ（大復活）
+if 'saved_premium_status' not in st.session_state: st.session_state.saved_premium_status = "無料版（機能制限あり）"
+
+# --- ⚙️ サイドバー（有料・無料切り替えスイッチの大復活） ---
+st.sidebar.header("👑 アプリの購入設定")
+user_mode = st.sidebar.radio(
+    "バージョン", 
+    ["無料版（機能制限あり）", "有料版（全機能解放）"],
+    index=0 if st.session_state.saved_premium_status == "無料版（機能制限あり）" else 1
+)
+st.session_state.saved_premium_status = user_mode
+is_premium = (user_mode == "有料版（全機能解放）")
+
 if st.sidebar.button("🔄 検索履歴を完全にリセット"):
     st.session_state.current_page = 0
     st.session_state.history_symptoms = set()
@@ -72,7 +85,7 @@ with st.expander("⚠️ 【重要】ご利用前の免責事項", expanded=Fals
 st.write("---")
 
 # =========================================================================
-# 👨‍⚕️ 【最上部】年齢の選択ボタン
+# 👨‍⚕️ 【最上部】年齢の選択ボタン（1番上に完全固定）
 # =========================================================================
 st.subheader("はじめに：お薬を飲む方の年齢を選んでください")
 age_mode = st.radio(
@@ -91,7 +104,7 @@ if age_mode != st.session_state.last_age_mode:
 st.write("---")
 
 # =========================================================================
-# 🎛️ 2列配置のチェックボタン
+# 🎛️ 【大復活】キーボードが絶対に立ち上がらない「2列配置のチェックボタン」
 # =========================================================================
 st.subheader("🩺 今のあなたの症状にチェックを入れてください（複数選択可）")
 symptom_cols = st.columns(2)
@@ -130,7 +143,6 @@ if selected_symptoms:
     matched_eff.sort(key=lambda x: (-x["count"], x["data"][rank_key]))
     matched_adv.sort(key=lambda x: (-x["count"], x["data"][rank_key]))
     
-    # ページネーション（1ページ3件切り出し）
     start_idx = st.session_state.current_page * 3
     end_idx = start_idx + 3
     
@@ -149,9 +161,10 @@ if selected_symptoms:
                 d = item["data"]
                 current_rank = d['child_rank'] if is_child else d['adult_rank']
                 st.info(f"**{d['name']}**\n\n📊 処方実績: {current_rank}位\n\n📜 効能: {', '.join(d['efficacy'])}")
-                st.caption(f"💊 **【区分: {d['type']}】**")
-                st.caption(f"💡 {d['category']}")
-                st.caption(f"📋 {d['mg_guide']}")
+                if is_premium: 
+                    st.caption(f"💊 **【区分: {d['type']}】**")
+                    st.caption(f"💡 {d['category']}")
+                    st.caption(f"📋 {d['mg_guide']}")
                     
                 encoded_name = urllib.parse.quote(d["prefix"])
                 amazon_url = f"https://amazon.co.jp{encoded_name}&tag=YOUR_ID-22"
@@ -166,33 +179,25 @@ if selected_symptoms:
                 d = item["data"]
                 current_rank = d['child_rank'] if is_child else d['adult_rank']
                 st.warning(f"**{d['name']}**\n\n📊 処方実績: {current_rank}位\n\n⚠️ 副作用: {', '.join(d['adverse'])}")
-                st.caption(f"💊 **【区分: {d['type']}】**")
-                st.caption(f"💡 {d['category']}")
+                if is_premium: 
+                    st.caption(f"💊 **【区分: {d['type']}】**")
+                    st.caption(f"💡 {d['category']}")
         else:
             st.write("該当するお薬はこれ以上ありません。")
 
     st.write("---")
     
-    # 🎛️ 【復活の核心】課金条件のブロックを完全排除し、誰でも100%最初から表示されるように変更！
-    st.success(f"🔓 **全機能解放中** （現在 {start_idx + 1} 〜 {start_idx + len(eff_show)} 位付近を表示中）")
-    
-    is_next_disabled = (len(matched_eff) <= end_idx)
-    if st.button("⏭️ 次の3件のお薬をめくる (次ページへ)", use_container_width=True, disabled=is_next_disabled, key="next_page_btn"):
-        st.session_state.current_page += 1
-        st.rerun()
+    # 🎛️ 【大復活】進む・戻るボタンエリア
+    # インデントエラーと文字化けを100%防ぐため、最も安全な記述（通常のif文の段落）で格納
+    if not is_premium:
+        st.error("🔒 **【機能制限】4位以降のより専門的なお薬は、有料版で全機能解放されます。**")
+        
+    if is_premium:
+        st.success(f"🔓 **有料版：全機能解放中** （現在 {start_idx + 1} 〜 {start_idx + len(eff_show)} 位付近を表示中）")
+        
+        is_next_disabled = (len(matched_eff) <= end_idx)
+        if st.button("⏭️ 次の3件のお薬をめくる (次ページへ)", use_container_width=True, disabled=is_next_disabled, key="next_page_btn"):
+            st.session_state.current_page += 1
+            st.rerun()
             
-    is_back_disabled = (st.session_state.current_page <= 0)
-    if st.button("⏮️ 1つ前の検索結果に戻る (前ページへ)", use_container_width=True, disabled=is_back_disabled, key="back_page_btn"):
-        st.session_state.current_page -= 1
-        st.rerun()
-
-# --- 🏥 病院検索セクション（ここも課金チェックを完全に削除） ---
-st.write("---")
-st.subheader("🗺️ あなたの症状に合わせた「最寄りの専門病院」ナビ")
-
-recommended_departments = set()
-if st.session_state.history_symptoms:
-    for s in st.session_state.history_symptoms:
-        if s in ["頭痛", "眠気"]: recommended_departments.add("脳神経外科" if not is_child else "小児科")
-        if s in ["発熱", "喉の痛み", "咳"]: recommended_departments.add("内科" if not is_child else "小児科")
-        if s in ["鼻炎", "くしゃみ"]: recommended_departments.add("耳鼻咽喉科")
+        is_back_disabled = (st.session_state.current_page <= 0)
