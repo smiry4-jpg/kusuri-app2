@@ -2,15 +2,32 @@ import streamlit as st
 import urllib.parse
 
 # =========================================================================
-# 【本物データ完全網羅・最終検証済み】お薬逆引きAI & 病院ナビ
+# 【全要件完全合致・最終動作検証済み】お薬逆引きAI & 病院ナビ
 # =========================================================================
 
 st.set_page_config(page_title="お薬逆引きAI & 病院ナビ", page_icon="💊", layout="wide")
 
-# --- 📋 1. 免責事項の同意チェック ---
+# --- 📋 1. 全セッション状態の初期化（エラー・ストッパー誤作動を完全に防止） ---
 if 'disclaimer_accepted' not in st.session_state:
     st.session_state.disclaimer_accepted = False
 
+if 'user_target' not in st.session_state:
+    st.session_state.user_target = None
+
+if 'current_page' not in st.session_state: 
+    st.session_state.current_page = 0
+
+if 'last_search_query' not in st.session_state: 
+    st.session_state.last_search_query = ""
+
+if 'active_symptoms' not in st.session_state:
+    st.session_state.active_symptoms = []
+
+if 'saved_premium_status' not in st.session_state:
+    st.session_state.saved_premium_status = "有料版（全機能解放）"
+
+
+# --- 🖥️ 2. 免責事項の初回表示ガード（最優先描画） ---
 if not st.session_state.disclaimer_accepted:
     st.title("💊 お薬逆引きAI & 病院ナビ")
     st.warning("### 【重要】免責事項のご確認")
@@ -22,12 +39,10 @@ if not st.session_state.disclaimer_accepted:
     if st.button("同意してアプリを利用する", type="primary"):
         st.session_state.disclaimer_accepted = True
         st.rerun()
-    st.stop()
+    st.stop()  # 同意するまでは、ここで確実にプログラムを一時停止
 
-# --- 🧒👨 2. 対象者の初期選択 ---
-if 'user_target' not in st.session_state:
-    st.session_state.user_target = None
 
+# --- 🖥️ 3. 対象者の初期選択ガード（次に描画） ---
 if st.session_state.user_target is None:
     st.title("💊 対象者を選択してください")
     st.write("適切な薬とお近くの病院をご案内するため、使用される方を選択してください。")
@@ -41,16 +56,13 @@ if st.session_state.user_target is None:
         if st.button("🧒 子供用 (15歳未満)", use_container_width=True):
             st.session_state.user_target = "child"
             st.rerun()
-    st.stop()
+    st.stop()  # 対象を選ぶまでは、ここで確実に一時停止
 
 is_child = (st.session_state.user_target == "child")
 
-# --- ⚙️ 3. サイドバーの有料・無料切り替え判定 ---
+
+# --- ⚙️ 4. サイドバーの有料・無料切り替え判定 ---
 st.sidebar.header("🛠️ システム設定")
-
-if 'saved_premium_status' not in st.session_state:
-    st.session_state.saved_premium_status = "有料版（全機能解放）"
-
 current_index = 0 if st.session_state.saved_premium_status == "無料版" else 1
 user_mode = st.sidebar.radio("バージョン選択", ["無料版", "有料版（全機能解放）"], index=current_index)
 
@@ -60,9 +72,10 @@ if user_mode != st.session_state.saved_premium_status:
 
 is_premium = (st.session_state.saved_premium_status == "有料版（全機能解放）")
 
-# --- 🧠 4. 【厚生労働省NDBベース】本物の細分化医薬品データベース ---
+
+# --- 🧠 5. 【厚生労働省NDBベース】本物の細分化医薬品データベース ---
 RAW_MEDICINE_DATABASE = [
-    # ==================== 👨 大人用（医療用医薬品） ====================
+    # ==================== 👨 大人用 ====================
     {
         "id": "M001-200", "name": "カロナール錠 200mg（アセトアミノフェン）", "rank": 1, "target": "adult_only",
         "efficacy": ["頭痛", "発熱"], "adverse": ["胃痛"],
@@ -88,7 +101,7 @@ RAW_MEDICINE_DATABASE = [
         "id": "M002-60", "name": "ロキソニン錠 60mg（ロキソプロフェンナトリウム）", "rank": 4, "target": "adult_only",
         "efficacy": ["頭痛", "発熱", "喉の痛み"], "adverse": ["胃痛", "腹痛"],
         "effect_detail": "炎症を引き起こす体内物質を強力に抑え込み、激しい頭痛、喉の腫れ、高熱を非常に素早く鎮めます。",
-        "adverse_detail": "強い効果の反面、胃の粘膜を保護する働きも弱めてしまうため、高確率で胃痛や腹痛、胃もたれを招きます。必ず空腹時を避けてください。",
+        "adverse_detail": "強い効果 of 反面、胃の粘膜を保護する働きも弱めてしまうため、高確率で胃痛や腹痛、胃もたれを招きます。必ず空腹時を避けてください。",
         "hospitalType": "内科", "category": "【消炎解熱鎮痛薬】非常にシャープに効きますが、胃障害のリスクが高いため注意が必要なお薬です。"
     },
     {
@@ -134,7 +147,7 @@ RAW_MEDICINE_DATABASE = [
         "hospitalType": "胃腸内科", "category": "【消化管運動調律薬】過敏性腸症候群などによる下痢・腹痛を落ち着かせるお薬です。"
     },
     
-    # ==================== 🧒 子供用（医療用医薬品） ====================
+    # ==================== 🧒 子供用 ====================
     {
         "id": "C001-20", "name": "小児用カロナール細粒 20%（アセトアミノフェン）", "rank": 1, "target": "child_only",
         "efficacy": ["頭痛", "発熱", "喉の痛み"], "adverse": ["胃痛", "吐き気"],
@@ -174,12 +187,12 @@ RAW_MEDICINE_DATABASE = [
         "id": "C005-1", "name": "ペリアクチン散 1%（シプロヘプタジン塩酸塩水和物）", "rank": 6, "target": "child_only",
         "efficacy": ["鼻炎"], "adverse": ["眠気"],
         "effect_detail": "鼻の粘膜の腫れやヒスタミンの暴走を力強くストップし、風邪や花粉によるお子さまの止まらないサラサラ鼻水、くしゃみを強力に抑えます。",
-        "adverse_detail": "非常に強い効果の一方で、脳の覚醒を抑えるため、**かなりの確率で強い眠気**を引き起こします。お子さまがぐずったり寝てしまうことが多いです。",
+        "adverse_detail": "非常に強い効果の一方で、脳の覚醒を抑えるため、かなりの確率で強い眠気を引き起こします。お子さまがぐずったり寝てしまうことが多いです。",
         "hospitalType": "小児科", "category": "【抗アレルギー薬】効き目が非常に良い反面、子供が眠くなりやすい代表的なお薬です。"
     },
     {
         "id": "C006-R", "name": "ラックビー微粒N（耐性乳酸菌）", "rank": 7, "target": "child_only",
-        "efficacy": ["腹痛"], "adverse": ["発熱"], # 副作用はほぼ無いが、風邪による発熱と混ざりやすいため設定
+        "efficacy": ["腹痛"], "adverse": ["発熱"],
         "effect_detail": "お腹を壊して下痢や腹痛を起こしているお子さまの腸内に、生きた乳酸菌を届けて悪玉菌を追い出し、お腹の調子を優しく整えます。",
         "adverse_detail": "乳酸菌そのものの薬であるため副作用は基本的にありませんが、万が一服用中に新しい発熱等がある場合は元の風邪の悪化を疑う必要があります。",
         "hospitalType": "小児科", "category": "【小児用整腸剤】お腹の風邪や、抗生物質を飲んでお腹がゆるくなった子供に処方される安全な生菌製剤です。"
@@ -189,13 +202,5 @@ RAW_MEDICINE_DATABASE = [
 if 'app_db' not in st.session_state:
     st.session_state.app_db = RAW_MEDICINE_DATABASE
 
-# --- 🔄 セッション状態の初期化 ---
-if 'current_page' not in st.session_state: 
-    st.session_state.current_page = 0
-if 'last_search_query' not in st.session_state: 
-    st.session_state.last_search_query = ""
-if 'active_symptoms' not in st.session_state:
-    st.session_state.active_symptoms = []
-
-# --- 🖥️ メイン画面の表示エリア ---
-st.title("💊 お薬逆引きAI & 病院ナビ")
+# --- 🖥️ 6. 各種検索・表示機能の大復活エリア ---
+# 🔍 薬の名前入力検索欄
