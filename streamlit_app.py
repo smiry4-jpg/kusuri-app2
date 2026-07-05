@@ -3,260 +3,142 @@ import random
 import urllib.parse
 
 # =========================================================================
-# 【3大バグ完全消滅・全要件合致検証済み】お薬逆引きAI & 病院ナビ
+# 【決定版】収益化ハイブリッド ＆ 最寄り病院検索システム搭載お薬仕分けアプリ
 # =========================================================================
 
-st.set_page_config(page_title="お薬逆引きAI & 病院ナビ", page_icon="💊", layout="wide")
+# アプリの初期設定（スマホ向けに画面を最適化）
+st.set_page_config(page_title="お薬逆引きAI & 病院ナビ", page_icon="💊", layout="centered")
 
-# --- 📋 1. 全セッション状態の初期化 ---
-if 'disclaimer_accepted' not in st.session_state:
-    st.session_state.disclaimer_accepted = False
-
-if 'user_target' not in st.session_state:
-    st.session_state.user_target = None
-
-if 'current_page' not in st.session_state: 
-    st.session_state.current_page = 0
-
-if 'last_search_query' not in st.session_state: 
-    st.session_state.last_search_query = ""
-
-# 💡【バグ①修正用】過去に選んでいた症状を記憶するセッションを新設
-if 'last_selected_symptoms' not in st.session_state:
-    st.session_state.last_selected_symptoms = []
-
-if 'saved_premium_status' not in st.session_state:
-    st.session_state.saved_premium_status = "有料版（全機能解放）"
-
-
-# --- 🖥️ 2. 免責事項の初回表示ガード ---
-if not st.session_state.disclaimer_accepted:
-    st.title("💊 お薬逆引きAI & 病院ナビ")
-    st.warning("### 【重要】免責事項のご確認")
-    st.write(
-        "本アプリで提供される薬の情報は、厚生労働省の公開データ（NDBオープンデータ等）を基に、"
-        "一般の方にわかりやすい表現に精査・改変したものです。医師の診断や"
-        "薬剤師の指導に代わるものではありません。症状が改善しない場合は必ず医療機関を受診してください。"
-    )
-    if st.button("同意してアプリを利用する", type="primary"):
-        st.session_state.disclaimer_accepted = True
-        st.rerun()
-    st.stop()
-
-
-# --- 🖥️ 3. 対象者の初期選択ガード ---
-if st.session_state.user_target is None:
-    st.title("💊 対象者を選択してください")
-    st.write("適切な薬とお近くの病院をご案内するため、使用される方を選択してください。")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("👨 大人用 (15歳以上)", use_container_width=True):
-            st.session_state.user_target = "adult"
-            st.rerun()
-    with col2:
-        if st.button("🧒 子供用 (15歳未満)", use_container_width=True):
-            st.session_state.user_target = "child"
-            st.rerun()
-    st.stop()
-
-user_choice = st.session_state.user_target
-is_child = (user_choice == "child")
-
-
-# --- ⚙️ 4. サイドバーの有料・無料切り替え判定 ---
-st.sidebar.header("🛠️ システム設定")
-current_index = 0 if st.session_state.saved_premium_status == "無料版" else 1
-user_mode = st.sidebar.radio("バージョン選択", ["無料版", "有料版（全機能解放）"], index=current_index)
-
-if user_mode != st.session_state.saved_premium_status:
-    st.session_state.saved_premium_status = user_mode
-    st.rerun()
-
-# 💡【バグ③修正】有料版の判定文字をサイドバーと1文字違わず完全に一致させました
-is_premium = (st.session_state.saved_premium_status == "有料版（全機能解放）")
-
-
-# --- 🧠 5. 【大復活】1,000件の細分化データベース構築 ---
+# --- 🧠 内部データベースとメモリの構築 ---
 if 'app_db' not in st.session_state:
     temp_db = []
     symptom_pool = ["頭痛", "発熱", "鼻炎", "眠気", "喉の痛み", "胃痛", "腹痛", "咳"]
     side_effect_pool = ["眠気", "頭痛", "吐き気", "胃痛", "腹痛", "むくみ", "めまい"]
-    brand_prefixes = ["ハナミズキラー", "アタマノン", "ズツウレス", "ロキソペイン", "ネツサゲール", "カロナイン", "セキドメミン", "ムコダイン"]
+    brand_prefixes = ["ハナミズキラー", "アタマノン", "ズツウレス", "ロキソペイン", "ネツサゲール", "カロナイン"]
     brand_suffixes = ["錠", "カプセル", "シロップ", "顆粒"]
     
-    hospital_mapping = {
-        "頭痛": "内科", "発熱": "内科", "鼻炎": "耳鼻咽喉科", "眠気": "睡眠外来",
-        "喉の痛み": "耳鼻咽喉科", "胃痛": "消化器内科", "腹痛": "胃腸内科", "咳": "呼吸器内科"
-    }
-    
-    drug_categories = {
-        "ハナミズキラー": "【アレルギー薬】花粉症などの鼻水・くしゃみを強力に抑える定番薬。厚生労働省の公開情報を精査し、わかりやすい言い回しに変更しています。",
-        "アタマノン": "【解熱鎮痛薬】脳の血管の腫れをピンポイントで鎮める特効薬。偏頭痛の発作時に速やかに作用します。",
-        "ズツウレス": "【解熱鎮痛薬】あらゆる頭の痛みを素早く遮断する汎用鎮痛薬。次の服用までは4時間以上あけます。",
-        "ロキソペイン": "【強力鎮痛薬】大人の激しい痛みや炎症をシャットアウトする消炎鎮痛薬。空腹時を避けて服用します。",
-        "ネツサゲール": "【解熱鎮痛薬】安全性が高く、熱と痛みの神経を優しくブロックするお薬です。",
-        "カロナイン": "【子供・妊婦も安心】胃への負担が極めて少ないマイルドな解熱鎮痛薬。子ども用の粉薬は体重に応じて正確に計算します。",
-        "セキドメミン": "【咳止め薬】脳の咳スイッチを鎮めて、止まらない激しい咳を楽にするお薬です。",
-        "ムコダイン": "【去痰薬】のどや鼻の通りをよくして、ウイルスを体外に排出しやすくするお薬です。"
-    }
-    
     for rank in range(1, 1001):
-        # 最初の50件は確実に頭痛・発熱、それ以降はランダム
-        eff_list = ["頭痛", "発熱"] if rank <= 50 else random.sample(symptom_pool, 2)
-        adv_list = ["眠気", "胃痛"] if rank <= 50 else random.sample(side_effect_pool, 2)
+        eff = ["頭痛", "発熱"] if rank <= 50 else random.sample(symptom_pool, 2)
+        adv = ["眠気", "胃痛"] if rank <= 50 else random.sample(side_effect_pool, 2)
         prefix = random.choice(brand_prefixes)
-        form_type = random.choice([" 60mg", " 150mg", " 300mg", " 500mg", " 細粒20%", " シロップ2%"])
-        
-        if prefix in ["ロキソペイン", "アタマノン"] or "500mg" in form_type:
-            target_attr = "adult"
-        elif prefix == "カロナイン" and ("細粒" in form_type or "シロップ" in form_type):
-            target_attr = "child"
-        else:
-            target_attr = "both"
-            
-        # 💡【バグ②修正用】 hospitalTypeをリストではなく、URLエラーにならない「純粋な文字列（内科など）」として格納
-        main_symptom = eff_list[0]
-        h_type = "小児科" if target_attr == "child" else hospital_mapping.get(main_symptom, "一般内科")
-        
         temp_db.append({
-            "id": f"DRUG-{rank:04d}",
-            "name": f"{prefix}{random.choice(brand_suffixes)}{form_type}",
-            "rank": rank,
-            "target": target_attr,
-            "efficacy": eff_list,
-            "adverse": adv_list,
-            "effect_detail": f"厚生労働省のデータを精査した結果、主に【{', '.join(eff_list)}】の症状に対して優れた緩和効果を発揮する言い回しに書き換えられています。",
-            "adverse_detail": f"添付文書の記載を精査した結果、服用後に体質によって【{', '.join(adv_list)}】の副反応が現れるリスクが報告されています。",
-            "hospitalType": h_type,
-            "category": drug_categories.get(prefix, "【一般治療薬】医師が日常的に処方する認可医薬品")
+            "name": f"「{prefix}{random.choice(brand_suffixes)}」",
+            "efficacy": eff, "adverse": adv, "rank": rank
         })
     st.session_state.app_db = temp_db
 
+if 'history_symptoms' not in st.session_state: st.session_state.history_symptoms = set()
+if 'is_premium' not in st.session_state: st.session_state.is_premium = False
 
-# --- 🖥️ 6. 各種検索・表示エリア ---
-# 🔍 薬の名前入力検索欄
-search_query = st.text_input("🔍 薬の名前や規格(mg)を入力して検索（例: カロナール錠 500mg）", placeholder="お薬名や規格を入力すると、その薬を直接絞り込んで表示します")
+# =========================================================================
+# ⚖️ 【仕掛け1】法的な罠を回避する「免責事項」の強制表示
+# =========================================================================
+st.title("💊 お薬逆引きAI ＆ 専門病院ナビ")
+with st.expander("⚠️ 【重要】ご利用前の免責事項（必ずお読みください）", expanded=True):
+    st.caption(
+        "本アプリは国内の処方統計および一般的な薬理データを基に機械的な仕分けを行うシステムであり、"
+        "医師の診断や医療行為に代わるものでは絶対にありません。掲載されているお薬の名称はデモ用表現です。"
+        "実際の体調不良に関しては、必ずお近くの医療機関を受診し、医師・薬剤師の指示に従ってください。"
+    )
 
-# 🎛️ 2列配置のチェックボックス方式症状選択
-st.subheader("🩺 今のあなたの症状にチェックを入れてください（複数選択可）")
-col_left, col_right = st.columns(2)
+st.write("---")
 
-selected_symptoms = []
+# =========================================================================
+# 💰 【仕掛け2】ユーザータイプの切り替え（購入シミュレーション）
+# =========================================================================
+st.sidebar.header("👑 アプリの購入設定（収益化モデル）")
+user_mode = st.sidebar.radio(
+    "アプリのバージョンを選択",
+    ["無料版（広告あり）", "有料版を購入（480円・広告なし）"]
+)
 
-with col_left:
-    if st.checkbox("頭痛", key="chk_headache"):
-        selected_symptoms.append("頭痛")
-    if st.checkbox("発熱", key="chk_fever"):
-        selected_symptoms.append("発熱")
-    if st.checkbox("鼻炎", key="chk_rhinitis"):
-        selected_symptoms.append("鼻炎")
-    if st.checkbox("眠気", key="chk_sleepy"):
-        selected_symptoms.append("眠気")
+# ユーザーの選択によって有料会員（プレミアム）フラグを切り替え
+st.session_state.is_premium = (user_mode == "有料版を購入（480円・広告なし）")
 
-with col_right:
-    if st.checkbox("喉の痛み", key="chk_throat"):
-        selected_symptoms.append("喉の痛み")
-    if st.checkbox("胃痛", key="chk_stomach"):
-        selected_symptoms.append("胃痛")
-    if st.checkbox("腹痛", key="chk_abdominal"):
-        selected_symptoms.append("腹痛")
-    if st.checkbox("咳", key="chk_cough"):
-        selected_symptoms.append("咳")
+if st.session_state.is_premium:
+    st.sidebar.success("🎉 有料プラン有効：広告はすべて非表示です")
+else:
+    st.sidebar.info("💡 480円で購入すると、画面内のすべての広告が永久に非表示になります。")
 
+# --- 📱 メイン画面：症状の選択 ---
+selected_symptoms = st.multiselect(
+    "今のあなたの症状をタップして選択してください（複数選択可）",
+    ["頭痛", "発熱", "鼻炎", "眠気", "喉の痛み", "胃痛", "腹痛", "咳"]
+)
 
-# 💡【バグ①修正：1位リスタート回路】
-# 症状のチェック状態、または名前検索ワードが1つ前と変わった瞬間を正確に検知し、ページ数を「0（1位）」に自動リセットします
-if selected_symptoms != st.session_state.last_selected_symptoms or search_query != st.session_state.last_search_query:
-    st.session_state.current_page = 0
-    st.session_state.last_selected_symptoms = selected_symptoms
-    st.session_state.last_search_query = search_query
-    st.rerun()  # 状態を確定させて1回だけ安全に再描画
-
-
-# --- 🔍 データ抽出・ソート・2列出力ロジック ---
-if selected_symptoms or search_query:
+# --- 🧠 アルゴリズムの実行 ---
+if selected_symptoms:
+    # 検索履歴を自動的に保存（あとで病院検索に使用）
+    for s in selected_symptoms:
+        st.session_state.history_symptoms.add(s)
+        
     matched_eff = []
     matched_adv = []
     
-    seen_ids_eff = set()
-    seen_ids_adv = set()
-    
+    # 複数症状の掛け算と処方率順ソート
     for drug in st.session_state.app_db:
-        # 大人・子供用フィルター
-        if drug["target"] != user_choice and drug["target"] != "both":
-            continue
+        eff_count = sum(1 for s in selected_symptoms if s in drug["efficacy"])
+        if eff_count > 0: matched_eff.append({"data": drug, "count": eff_count})
             
-        # 名前検索フィルター
-        if search_query and search_query not in drug["name"]:
-            continue
+        adv_count = sum(1 for s in selected_symptoms if s in drug["adverse"])
+        if adv_count > 0: matched_adv.append({"data": drug, "count": adv_count})
             
-        # 症状マッチング計算
-        if selected_symptoms:
-            keyword_count = sum(1 for s in selected_symptoms if s in drug["efficacy"])
-            keyword_count_adv = sum(1 for s in selected_symptoms if s in drug["adverse"])
-            
-            if keyword_count > 0 and drug["id"] not in seen_ids_eff:
-                matched_eff.append({"data": drug, "count": keyword_count})
-                seen_ids_eff.add(drug["id"])
-                
-            if keyword_count_adv > 0 and drug["id"] not in seen_ids_adv:
-                matched_adv.append({"data": drug, "count": keyword_count_adv})
-                seen_ids_adv.add(drug["id"])
-        else:
-            # 名前検索のみの場合
-            if drug["id"] not in seen_ids_eff:
-                matched_eff.append({"data": drug, "count": 1})
-                seen_ids_eff.add(drug["id"])
-            if drug["id"] not in seen_ids_adv:
-                matched_adv.append({"data": drug, "count": 1})
-                seen_ids_adv.add(drug["id"])
-                
-    # ソート（一致数が多い順 ＆ 処方率順位の上位順）
     matched_eff.sort(key=lambda x: (-x["count"], x["data"]["rank"]))
     matched_adv.sort(key=lambda x: (-x["count"], x["data"]["rank"]))
     
-    # 無料版制限
-    if not is_premium:
-        matched_eff = matched_eff[:3]
-        matched_adv = matched_adv[:3]
+    eff_show = matched_eff[:3]
+    shown_eff_names = [item["data"]["name"] for item in eff_show]
+    filtered_adv = [item for item in matched_adv if item["data"]["name"] not in shown_eff_names]
+    adv_show = filtered_adv[:3]
     
-    # ページネーション位置計算
-    start_idx = st.session_state.current_page * 3
-    end_idx = start_idx + 3
-    
-    eff_show = matched_eff[start_idx:end_idx]
-    shown_eff_ids = [item["data"]["id"] for item in eff_show]
-    
-    # 【重複排除】左列に出たものは右列から完全排除
-    filtered_adv = [item for item in matched_adv if item["data"]["id"] not in shown_eff_ids]
-    adv_show = filtered_adv[start_idx:end_idx]
-    
-    # 💻 結果を左右2列に出力
-    st.write("---")
+    # 画面へのカード出力
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("🔵 効率よく『同時に治せる』お薬")
-        if eff_show:
-            for item in eff_show:
-                d = item["data"]
-                st.info(f"**{d['name']}** (コード:{d['id']} / 処方:{d['rank']}位)\n\n📜 **精査された効能・使用条件**:\n{d['effect_detail']}")
-                if is_premium: st.caption(f"💡 {d['category']}")
-                
-                # 📍【バグ②修正】余計な記号を完全に排除し、確実にジャンプする正しいURLを生成
-                map_query = urllib.parse.quote(f"{d['hospitalType']} 近く")
-                map_url = f"https://google.com{map_query}"
-                st.link_button(f"📍 近くの「{d['hospitalType']}」をマップで案内", map_url, type="secondary")
-        else:
-            st.write("該当するお薬はこれ以上ありません。")
+        for item in eff_show:
+            d = item["data"]
+            st.info(f"**{d['name']}** (処方:{d['rank']}位)\n\n📜 効能: {', '.join(d['efficacy'])}")
+            
+            # 💰 【仕掛け3】無料版にだけ「成果報酬型広告ボタン」を自動出現させる
+            if not st.session_state.is_premium:
+                # Amazonや楽天の検索URLにアフィリエイトIDを付与する仕組み（例としてAmazonのリンクを自動構築）
+                encoded_name = urllib.parse.quote(d["name"].replace("「", "").replace("」", ""))
+                amazon_affiliate_url = f"https://amazon.co.jp{encoded_name}&tag=YOUR_AFFILIATE_ID-22"
+                st.markdown(f"[🛒 このお薬の類似市販薬をAmazonで探す（広告）]({amazon_affiliate_url})")
 
     with col2:
         st.subheader("🔴 『副作用で出やすい』お薬")
-        if adv_show:
-            for item in adv_show:
-                d = item["data"]
-                st.warning(f"**{d['name']}** (コード:{d['id']} / 処方:{d['rank']}位)\n\n⚠️ **精査された副作用・リスク**:\n{d['adverse_detail']}")
-                if is_premium: st.caption(f"💡 {d['category']}")
-                
-                # 📍【バグ②修正】
-                map_query = urllib.parse.quote(f"{d['hospitalType']} 近く")
+        for item in adv_show:
+            d = item["data"]
+            st.warning(f"**{d['name']}** (処方:{d['rank']}位)\n\n⚠️ 副作用: {', '.join(d['adverse'])}")
+
+    st.write("---")
+
+# =========================================================================
+# 🏥 【仕掛け4】検索履歴から最寄りの最適な専門病院をマップで探すシステム
+# =========================================================================
+st.subheader("🗺️ あなたの症状に合わせた「最寄りの専門病院」ナビ")
+
+if st.session_state.history_symptoms:
+    # ユーザーの過去の検索履歴を読み取って、行くべき「最適な診療科」を自動判定するアルゴリズム
+    recommended_departments = set()
+    for s in st.session_state.history_symptoms:
+        if s in ["頭痛", "眠気"]: recommended_departments.add("脳神経外科")
+        if s in ["発熱", "喉の痛み", "咳"]: recommended_departments.add("内科")
+        if s in ["鼻炎"]: recommended_departments.add("耳鼻咽喉科")
+        if s in ["胃痛", "腹痛"]: recommended_departments.add("消化器内科")
+        
+    st.write(f"📊 過去の検索履歴（{', '.join([f'【{h}】' for h in st.session_state.history_symptoms])}）を分析しました。")
+    st.write(f"👉 今行くべきおすすめの診療科： **{ '、'.join(list(recommended_departments)) }**")
+    
+    # 診療科に応じたGoogleマップのナビゲーションリンクを一瞬で自動生成
+    # スマホのGPS（現在地）から最寄りの病院へ直接ルート案内させます
+    primary_dept = list(recommended_departments)[0] if recommended_departments else "内科"
+    map_query = urllib.parse.quote(f"近くの {primary_dept}")
+    google_map_url = f"https://google.com{map_query}"
+    
+    st.success(f"📍 下のボタンを押すと、あなたの現在地から最寄りの「{primary_dept}」の一覧とルートが地図で開きます。")
+    st.link_button(f"🗺️ 最寄りの {primary_dept} をGoogleマップで探す", google_map_url)
+    
+else:
+    st.info("上のボックスで症状を検索すると、その履歴を解析して、あなたに最適な近くの専門病院のルートマップボタンがここに自動出現します。")
