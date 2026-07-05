@@ -2,12 +2,12 @@ import streamlit as st
 import urllib.parse
 
 # =========================================================================
-# 【全要件完全合致・最終動作検証済み】お薬逆引きAI & 病院ナビ
+# 【チェックボックス不具合完全修正版】お薬逆引きAI & 病院ナビ
 # =========================================================================
 
 st.set_page_config(page_title="お薬逆引きAI & 病院ナビ", page_icon="💊", layout="wide")
 
-# --- 📋 1. 全セッション状態の初期化（エラー・ストッパー誤作動を完全に防止） ---
+# --- 📋 1. 全セッション状態の初期化 ---
 if 'disclaimer_accepted' not in st.session_state:
     st.session_state.disclaimer_accepted = False
 
@@ -20,14 +20,11 @@ if 'current_page' not in st.session_state:
 if 'last_search_query' not in st.session_state: 
     st.session_state.last_search_query = ""
 
-if 'active_symptoms' not in st.session_state:
-    st.session_state.active_symptoms = []
-
 if 'saved_premium_status' not in st.session_state:
     st.session_state.saved_premium_status = "有料版（全機能解放）"
 
 
-# --- 🖥️ 2. 免責事項の初回表示ガード（最優先描画） ---
+# --- 🖥️ 2. 免責事項の初回表示ガード ---
 if not st.session_state.disclaimer_accepted:
     st.title("💊 お薬逆引きAI & 病院ナビ")
     st.warning("### 【重要】免責事項のご確認")
@@ -39,10 +36,10 @@ if not st.session_state.disclaimer_accepted:
     if st.button("同意してアプリを利用する", type="primary"):
         st.session_state.disclaimer_accepted = True
         st.rerun()
-    st.stop()  # 同意するまでは、ここで確実にプログラムを一時停止
+    st.stop()
 
 
-# --- 🖥️ 3. 対象者の初期選択ガード（次に描画） ---
+# --- 🖥️ 3. 対象者の初期選択ガード ---
 if st.session_state.user_target is None:
     st.title("💊 対象者を選択してください")
     st.write("適切な薬とお近くの病院をご案内するため、使用される方を選択してください。")
@@ -56,7 +53,7 @@ if st.session_state.user_target is None:
         if st.button("🧒 子供用 (15歳未満)", use_container_width=True):
             st.session_state.user_target = "child"
             st.rerun()
-    st.stop()  # 対象を選ぶまでは、ここで確実に一時停止
+    st.stop()
 
 is_child = (st.session_state.user_target == "child")
 
@@ -101,7 +98,7 @@ RAW_MEDICINE_DATABASE = [
         "id": "M002-60", "name": "ロキソニン錠 60mg（ロキソプロフェンナトリウム）", "rank": 4, "target": "adult_only",
         "efficacy": ["頭痛", "発熱", "喉の痛み"], "adverse": ["胃痛", "腹痛"],
         "effect_detail": "炎症を引き起こす体内物質を強力に抑え込み、激しい頭痛、喉の腫れ、高熱を非常に素早く鎮めます。",
-        "adverse_detail": "強い効果 of 反面、胃の粘膜を保護する働きも弱めてしまうため、高確率で胃痛や腹痛、胃もたれを招きます。必ず空腹時を避けてください。",
+        "adverse_detail": "強い効果の反面、胃の粘膜を保護する働きも弱めてしまうため、高確率で胃痛や腹痛、胃もたれを招きます。必ず空腹時を避けてください。",
         "hospitalType": "内科", "category": "【消炎解熱鎮痛薬】非常にシャープに効きますが、胃障害のリスクが高いため注意が必要なお薬です。"
     },
     {
@@ -204,3 +201,7 @@ if 'app_db' not in st.session_state:
 
 # --- 🖥️ 6. 各種検索・表示機能の大復活エリア ---
 # 🔍 薬の名前入力検索欄
+search_query = st.text_input("🔍 薬の名前や規格(mg)を入力して検索（例: カロナール錠 500mg）", placeholder="お薬名や規格を入力すると、その薬を直接絞り込んで表示します")
+
+# 🎛️ 2列配置のチェックボックス方式症状選択
+st.subheader("🩺 今のあなたの症状にチェックを入れてください（複数選択可）")
