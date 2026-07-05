@@ -3,16 +3,16 @@ import random
 import urllib.parse
 
 # =========================================================================
-# 【正真正銘の最終決定版】すべての成功機能を完全にドッキングした最高峰アプリ
+# 【正真正銘の最終完成版】成功コードの土台をベースにすべての改善点を完全追加
 # =========================================================================
 
 st.set_page_config(page_title="お薬逆引きAI & 病院ナビ", page_icon="💊", layout="centered")
 
-# --- 🧠 内部データベースの構築（2,000件すべて完全に名前の異なる独立データ） ---
+# --- 🧠 内部データベースの構築（量・規格違いを含めて豊富に展開） ---
 if 'app_db' not in st.session_state:
     temp_db = []
     
-    # 9種類のベースジャンル
+    # 9種類のベースジャンル（量や形の違いによるリアルな医療用規格データ）
     base_templates = [
         {"prefix": "ロキソペイン錠 60mg", "desc": "【標準消炎鎮痛量】大人の激しい頭痛や急な発熱、関節の炎症を素早く鎮める消炎鎮痛薬の標準サイズです。", "eff": ["頭痛", "発熱", "歯痛", "関節痛"], "adv": ["胃痛", "腹痛"], "target": "adult_only", "type": "一般薬", "mg_guide": "●大人の頭痛・発熱・歯痛時の頓服：1回 60mg を、空腹時を避けて服用します。"},
         {"prefix": "カロナイン錠 300mg", "desc": "【中容量解熱鎮痛】胃に優しい成分。軽度の頭痛や、小柄な方・高齢者の方の熱をマイルドに下げるサイズです。", "eff": ["頭痛", "発熱", "喉の痛み"], "adv": ["眠気"], "target": "all", "type": "一般薬", "mg_guide": "●大人の発熱・痛みの緩和：症状や年齢に合わせて 1回 300mg〜600mg の間で細かく調節されます。"},
@@ -26,6 +26,7 @@ if 'app_db' not in st.session_state:
         {"prefix": "スピロペント錠 10mcg", "desc": "【気管支拡張薬】気管支の筋肉を強力にゆるめて空気の通り道を広げ、止まらない激しい喘息の咳を楽にする専門薬です。", "eff": ["咳"], "adv": ["手の震え", "頭痛"], "target": "all", "type": "専門薬（呼吸器内科）", "mg_guide": "●喘息の咳：成人は1日2回、1回 10mcg（マイクログラム）を朝・就寝前に服用します。"}
     ]
     
+    # 重複の解決：1号〜2000号まで名前自体を完全に分けて2,000件作成
     for rank in range(1, 2001):
         template = base_templates[rank % len(base_templates)]
         unique_drug_name = f"{template['prefix']}・{rank}号"
@@ -57,10 +58,10 @@ if 'last_selected_symptoms' not in st.session_state: st.session_state.last_selec
 if 'current_page' not in st.session_state: st.session_state.current_page = 0
 if 'last_age_mode' not in st.session_state: st.session_state.last_age_mode = "👨 大人（15歳以上）"
 
-# 有料版状態の永続記憶メモリ（大復活）
+# 有料版状態の永続記憶メモリ
 if 'saved_premium_status' not in st.session_state: st.session_state.saved_premium_status = "無料版（機能制限あり）"
 
-# --- ⚙️ サイドバー（有料・無料切り替えスイッチの大復活） ---
+# --- ⚙️ サイドバー（有料・無料切り替えスイッチ） ---
 st.sidebar.header("👑 アプリの購入設定")
 user_mode = st.sidebar.radio(
     "バージョン", 
@@ -188,7 +189,6 @@ if selected_symptoms:
     st.write("---")
     
     # 🎛️ 【大復活】進む・戻るボタンエリア
-    # インデントエラーと文字化けを100%防ぐため、最も安全な記述（通常のif文の段落）で格納
     if not is_premium:
         st.error("🔒 **【機能制限】4位以降のより専門的なお薬は、有料版で全機能解放されます。**")
         
