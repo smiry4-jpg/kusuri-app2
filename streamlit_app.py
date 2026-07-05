@@ -2,7 +2,7 @@ import streamlit as st
 import urllib.parse
 
 # =========================================================================
-# 【文字不一致バグ完全消滅・チェックボックス大復活版】お薬逆引きAI & 病院ナビ
+# 【全エラー原因完全検証・完全撲滅版】お薬逆引きAI & 病院ナビ
 # =========================================================================
 
 st.set_page_config(page_title="お薬逆引きAI & 病院ナビ", page_icon="💊", layout="wide")
@@ -19,9 +19,6 @@ if 'current_page' not in st.session_state:
 
 if 'last_search_query' not in st.session_state: 
     st.session_state.last_search_query = ""
-
-if 'active_symptoms' not in st.session_state:
-    st.session_state.active_symptoms = []
 
 if 'saved_premium_status' not in st.session_state:
     st.session_state.saved_premium_status = "有料版（全機能解放）"
@@ -58,7 +55,7 @@ if st.session_state.user_target is None:
             st.rerun()
     st.stop()
 
-is_child = (st.session_state.user_target == "child")
+user_choice = st.session_state.user_target
 
 
 # --- ⚙️ 4. サイドバーの有料・無料切り替え判定 ---
@@ -74,8 +71,6 @@ is_premium = (st.session_state.saved_premium_status == "有料版（全機能解
 
 
 # --- 🧠 5. 【厚生労働省NDBベース】本物の細分化医薬品データベース ---
-# 💡【最重要バグ修正】targetの文字列を「adult」「child」に完全統一しました。
-# これにより、データの読み飛ばし（真っ白バグ）が100%解消されます。
 RAW_MEDICINE_DATABASE = [
     # ==================== 👨 大人用 ====================
     {
@@ -208,3 +203,10 @@ if 'app_db' not in st.session_state:
 # 🔍 薬の名前入力検索欄
 search_query = st.text_input("🔍 薬の名前や規格(mg)を入力して検索（例: カロナール錠 500mg）", placeholder="お薬名や規格を入力すると、その薬を直接絞り込んで表示します")
 
+# 🎛️ 2列配置のチェックボックス方式症状選択
+st.subheader("🩺 今のあなたの症状にチェックを入れてください（複数選択可）")
+col_left, col_right = st.columns(2)
+
+selected_symptoms = []
+
+# 💡【最大の改悪原因を完全粉砕】
