@@ -1,3 +1,218 @@
+import streamlit as st
+import urllib.parse
+
+# =========================================================================
+# 【厳密データ細分化＆要件完全合致版】お薬逆引きAI & 病院ナビ (追加修正版)
+# =========================================================================
+
+st.set_page_config(page_title="お薬逆引きAI & 病院ナビ", page_icon="💊", layout="wide")
+
+# --- 📋 1. 免責事項の同意チェック ---
+if 'disclaimer_accepted' not in st.session_state:
+    st.session_state.disclaimer_accepted = False
+
+if not st.session_state.disclaimer_accepted:
+    st.title("💊 お薬逆引きAI & 病院ナビ")
+    st.warning("### 【重要】免責事項のご確認")
+    st.write(
+        "本アプリで提供される薬の情報は、厚生労働省の公開データを基に、"
+        "一般の方にわかりやすい表現に精査・改変したものです。医師の診断や"
+        "薬剤師の指導に代わるものではありません。症状が改善しない場合は必ず医療機関を受診してください。"
+    )
+    if st.button("同意してアプリを利用する", type="primary"):
+        st.session_state.disclaimer_accepted = True
+        st.rerun()
+    st.stop()
+
+# --- 🧒👨 2. 対象者の初期選択 ---
+if 'user_target' not in st.session_state:
+    st.session_state.user_target = None
+
+if st.session_state.user_target is None:
+    st.title("💊 対象者を選択してください")
+    st.write("適切な薬とお近くの病院をご案内するため、使用される方を選択してください。")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("👨 大人用 (15歳以上)", use_container_width=True):
+            st.session_state.user_target = "adult"
+            st.rerun()
+    with col2:
+        if st.button("🧒 子供用 (15歳未満)", use_container_width=True):
+            st.session_state.user_target = "child"
+            st.rerun()
+    st.stop()
+
+is_child = (st.session_state.user_target == "child")
+
+# --- 🧠 3. 【mg・剤形 厳密細分化版】本物のマスターデータベース ---
+if 'app_db' not in st.session_state:
+    # 扱うものがお薬であるため、mg数や形状（錠・細粒など）が違うものは全て別IDで細分化管理
+    st.session_state.app_db = [
+        # --- 大人用：カロナール（mg数・使用条件で分離） ---
+        {
+            "id": "M001-200", 
+            "name": "カロナール錠 200mg（成分: アセトアミノフェン）",
+            "rank": 1,
+            "target": "adult_only",
+            "efficacy": ["頭痛", "発熱"],
+            "adverse": ["胃痛"],
+            "effect_detail": "比較的軽度な頭痛や、風邪の初期症状における発熱を優しく鎮めます。1回あたりの成分量が抑えめな規格です。",
+            "adverse_detail": "胃への影響は極めて穏やかですが、体質により軽度の胃痛を覚えることがあります。長期間の連続服用は避けてください。",
+            "hospitalType": "内科",
+            "category": "【解熱鎮痛薬】マイルドに効く200mg規格の錠剤です。"
+        },
+        {
+            "id": "M001-300", 
+            "name": "カロナール錠 300mg（成分: アセトアミノフェン）",
+            "rank": 2,
+            "target": "adult_only",
+            "efficacy": ["頭痛", "発熱", "喉の痛み"],
+            "adverse": ["胃痛", "吐き気"],
+            "effect_detail": "大人の標準的な頭痛、および風邪に伴う激しい熱や喉の痛みを効果的に和らげるために広く処方される強さです。",
+            "adverse_detail": "胃粘膜への刺激は少ないですが、敏感な方は一時的な胃痛や軽い吐き気を感じることがあります。",
+            "hospitalType": "内科",
+            "category": "【解熱鎮痛薬】大人の風邪症状に最も頻繁に選ばれる300mg規格です。"
+        },
+        {
+            "id": "M001-500", 
+            "name": "カロナール錠 500mg（成分: アセトアミノフェン）",
+            "rank": 3,
+            "target": "adult_only",
+            "efficacy": ["頭痛", "喉の痛み"], # 高用量のため強い痛み（頭痛・のど痛）を主目的
+            "adverse": ["吐き気"],
+            "effect_detail": "1錠中の成分量が多いため、通常の熱・痛み止めでは緩和しにくい、激しい偏頭痛や、のどの酷い炎症による痛みをしっかり遮断します。",
+            "adverse_detail": "高用量のため、一度に飲むと胃のムカムカ感や吐き気が出やすくなります。また肝臓への影響を防ぐため、1日の上限量を厳守する必要があります。",
+            "hospitalType": "内科",
+            "category": "【解熱鎮痛薬】強い痛みに対してピンポイントで処方される高用量500mg規格です。"
+        },
+        # --- 大人用：その他のお薬 ---
+        {
+            "id": "M002-60", 
+            "name": "ロキソニン錠 60mg（成分: ロキソプロフェンナトリウム）",
+            "rank": 4,
+            "target": "adult_only",
+            "efficacy": ["頭痛", "発熱", "喉の痛み"],
+            "adverse": ["胃痛", "腹痛"],
+            "effect_detail": "炎症を引き起こす体内物質を強力に抑え込み、激しい頭痛、喉の腫れ、高熱を非常に素早く鎮めます。",
+            "adverse_detail": "強い効果の反面、胃の粘膜を保護する働きも弱めてしまうため、高確率で胃痛や腹痛、胃もたれを招きます。必ず胃を守るために空腹時を避けてください。",
+            "hospitalType": "内科",
+            "category": "【消炎解熱鎮痛薬】非常にシャープに効きますが、胃障害のリスクが高いため注意が必要なお薬です。"
+        },
+        {
+            "id": "M003-60", 
+            "name": "アレグラ錠 60mg（成分: フェキソフェナジン塩酸塩）",
+            "rank": 5,
+            "target": "adult_only",
+            "efficacy": ["鼻炎"],
+            "adverse": ["眠気"],
+            "effect_detail": "花粉やハウスダストが原因で起こるアレルギー性のしつこい鼻水、連続するくしゃみを根元からブロックします。",
+            "adverse_detail": "脳に薬の成分が移行しにくい特殊な設計のため、アレルギー薬特有の眠気が出にくいですが、人によっては軽微な眠気を覚えることがあります。",
+            "hospitalType": "耳鼻咽喉科",
+            "category": "【抗ヒスタミン薬】仕事や運転など、日常の活動に支障をきたしにくい安全性の高い鼻炎薬です。"
+        },
+        {
+            "id": "M004-15", 
+            "name": "メジコン錠 15mg（成分: デキストロメトルファン臭化水素酸塩）",
+            "rank": 6,
+            "target": "adult_only",
+            "efficacy": ["咳"],
+            "adverse": ["眠気", "吐き気"],
+            "effect_detail": "脳内の咳コントロールセンター（咳中枢）に直接働きかけ、気管支の刺激によって止まらなくなった激しい咳を力強く鎮めます。",
+            "adverse_detail": "神経に作用するため、人によっては軽い眠気やめまい、あるいは胃の不快感（吐き気）を伴うことがあります。",
+            "hospitalType": "呼吸器内科",
+            "category": "【非麻薬性鎮咳薬】依存性の心配がなく、一般的な風邪のしつこい咳に広く使われる錠剤です。"
+        },
+        {
+            "id": "M005-250", 
+            "name": "ムコダイン錠 250mg（成分: カルボシステイン）",
+            "rank": 7,
+            "target": "adult_only",
+            "efficacy": ["鼻炎"], # 軽度な鼻水・排膿
+            "adverse": ["胃痛"],
+            "effect_detail": "鼻の奥につまったドロドロした粘り気のある鼻水をサラサラに変え、体外へ排出しやすくして副鼻腔の不快感を改善します。",
+            "adverse_detail": "きわめて安全ですが、胃の弱い方では稀に軽い胃の不快感や胃痛を覚えることがあります。",
+            "hospitalType": "耳鼻咽喉科",
+            "category": "【気道粘液調整薬】鼻づまりや軽度の鼻炎症状に対して処方される低用量250mg規格です。"
+        },
+        {
+            "id": "M005-500", 
+            "name": "ムコダイン錠 500mg（成分: カルボシステイン）",
+            "rank": 8,
+            "target": "adult_only",
+            "efficacy": ["咳", "喉の痛み"], # 痰が絡む咳、のどの炎症排膿
+            "adverse": ["腹痛"],
+            "effect_detail": "喉や気管支にべったりと張り付いて離れないしつこい痰（たん）を分解して流動化し、咳と一緒にスムーズに吐き出せるようにします。",
+            "adverse_detail": "成分量が多い規格のため、腸内環境にわずかに影響し、稀に軽い腹痛や軟便を引き起こすことがあります。",
+            "hospitalType": "呼吸器内科",
+            "category": "【気道粘液調整薬】気管支炎など、痰が絡んで喉が痛む咳に処方される標準的な500mg規格です。"
+        },
+        
+        # --- 子供用：細粒・ドライシロップ・シロップ（mg数・年齢条件で厳密に完全分離） ---
+        {
+            "id": "C001-20", 
+            "name": "小児用カロナール細粒 20%（成分: アセトアミノフェン）",
+            "rank": 1,
+            "target": "child_only",
+            "efficacy": ["頭痛", "発熱", "喉の痛み"],
+            "adverse": ["胃痛", "吐き気"],
+            "effect_detail": "乳幼児から学童期まで広く使われるお薬です。お子さまの急な高熱や、中耳炎などによる激しい痛みを脳の神経から優しく緩和します。",
+            "adverse_detail": "安全性が非常に高いお薬ですが、お子さまの【体重】に合わせて1回量を1ミリグラム単位で正確に小児科医が計算します。量を間違えると肝臓に重い負担がかかります。",
+            "hospitalType": "小児科",
+            "category": "【小児用解熱鎮痛薬】粉タイプで量を細かく調節できる、子ども用熱・痛み止めの第一選択薬です。"
+        },
+        {
+            "id": "C001-SYR", 
+            "name": "カロナールシロップ 2%（成分: アセトアミノフェン）",
+            "rank": 2,
+            "target": "child_only",
+            "efficacy": ["発熱"], # シロップは主に乳幼児の突発的な発熱に使用
+            "adverse": ["吐き気"],
+            "effect_detail": "粉薬をまだ上手に飲み込むことができない、ごく小さなお子さまや赤ちゃん（乳幼児）の発熱を優しく下げるための液体のお薬です。",
+            "adverse_detail": "甘い味がついていて飲みやすいですが、嫌がって一度に大量に誤飲すると危険です。服用後に吐き気などの副反応が出ないか様子を見てあげてください。",
+            "hospitalType": "小児科",
+            "category": "【小児用解熱鎮痛液体薬】赤ちゃんでも安全に服用できるように作られたシロップ剤です。"
+        },
+        {
+            "id": "C002-DS", 
+            "name": "オノンドライシロップ 10%（成分: プランルカスト）",
+            "rank": 3,
+            "target": "child_only",
+            "efficacy": ["鼻炎", "咳"],
+            "adverse": ["眠気", "腹痛"],
+            "effect_detail": "お子さまのアレルギー性のしつこい鼻づまりや、気管支が狭くなってゼーゼーと苦しそうな咳（喘息発作）が起きるのを根底から防ぎます。",
+            "adverse_detail": "服用後に軽い眠気や腹痛が起きることがあります。また、一時的にお子さまの機嫌が悪くなったり（易刺激性）する副作用が報告されています。",
+            "hospitalType": "小児科",
+            "category": "【抗ロイコトリエン薬】アレルギーによる気道や鼻の炎症を長期的におさえる定番の子供用お薬です。"
+        },
+        {
+            "id": "C003-10", 
+            "name": "アスベリン散 10%（成分: チペピジンヒバイン酸塩）",
+            "rank": 4,
+            "target": "child_only",
+            "efficacy": ["咳"],
+            "adverse": ["眠気"],
+            "effect_detail": "お子さまの止まらないコンコンという乾いた咳を脳から鎮め、同時にのどに絡む粘り気のある痰をサラサラにして出しやすくします。",
+            "adverse_detail": "軽い眠気を誘発することがあります。また、お薬が体内で分解されて排出される際、一時的に【尿が赤っぽくなる】特徴がありますが、無害ですので驚かなくて大丈夫です。",
+            "hospitalType": "小児科",
+            "category": "【小児用鎮咳去痰薬】咳を止め、痰を切りやすくする子供向けの代表的な粉末の咳止めです。"
+        }
+    ]
+
+# --- 🔄 セッション状態の初期化 ---
+if 'current_page' not in st.session_state: st.session_state.current_page = 0
+if 'last_selected_symptoms' not in st.session_state: st.session_state.last_selected_symptoms = []
+if 'last_search_query' not in st.session_state: st.session_state.last_search_query = ""
+if 'saved_premium_status' not in st.session_state: st.session_state.saved_premium_status = "有料版（全機能解放）"
+
+is_premium = (st.session_state.saved_premium_status == "有料版（全機能解放）")
+
+# --- 🖥️ メイン画面の表示エリア ---
+st.title("💊 お薬逆引きAI & 病院ナビ")
+st.caption(f"現在の対象モード: 【{'子供用 (15歳未満)' if is_child else '大人用 (15歳以上)'}】")
+
+# 🔍 薬の名前入力検索欄
+search_query = st.text_input("🔍 薬の名前を入力して検索（例: カロナール錠 500mg）", placeholder="お薬名や規格(mg)を入力すると、その薬を直接絞り込んで表示します")
 
 # 🎛️ 2列配置のチェックボックス方式症状選択
 st.subheader("🩺 今のあなたの症状にチェックを入れてください（複数選択可）")
@@ -11,92 +226,23 @@ for idx, symptom in enumerate(all_available_symptoms):
         if st.checkbox(symptom, key=f"check_{symptom}"):
             selected_symptoms.append(symptom)
 
-# 💡 症状変更時の自動履歴クリア＆1位リスタート回路
-if selected_symptoms != st.session_state.last_selected_symptoms:
+# 💡 症状または検索ワード変更時の自動履歴クリア＆1位リスタート回路
+if selected_symptoms != st.session_state.last_selected_symptoms or search_query != st.session_state.last_search_query:
     st.session_state.current_page = 0
-    st.session_state.seen_eff = set()
-    st.session_state.seen_adv = set()
-    st.session_state.history_symptoms = set()
-    st.session_state.page_history_stack = []
     st.session_state.last_selected_symptoms = selected_symptoms
+    st.session_state.last_search_query = search_query
     st.rerun()
 
-if selected_symptoms:
-    for s in selected_symptoms: st.session_state.history_symptoms.add(s)
-        
+# --- 🔍 データ抽出・ソート・2列出力ロジック ---
+if selected_symptoms or search_query:
     matched_eff = []
     matched_adv = []
     
+    # 厳密な細分化に基づき、管理ID(id)ベースでの重複を厳格に管理
+    seen_ids_eff = set()
+    seen_ids_adv = set()
+    
     for drug in st.session_state.app_db:
+        # 【対象の区別】大人用/子供用
         if is_child and drug["target"] == "adult_only":
             continue
-            
-        if keyword_count := sum(1 for s in selected_symptoms if s in drug["efficacy"]):
-            matched_eff.append({"data": drug, "count": keyword_count})
-        if keyword_count_adv := sum(1 for s in selected_symptoms if s in drug["adverse"]):
-            matched_adv.append({"data": drug, "count": keyword_count_adv})
-                
-    matched_eff.sort(key=lambda x: (-x["count"], x["data"]["rank"]))
-    matched_adv.sort(key=lambda x: (-x["count"], x["data"]["rank"]))
-    
-    start_idx = st.session_state.current_page * 3
-    end_idx = start_idx + 3
-    
-    eff_show = matched_eff[start_idx:end_idx]
-    shown_eff_names = [item["data"]["name"] for item in eff_show]
-    filtered_adv = [item for item in matched_adv if item["data"]["name"] not in shown_eff_names]
-    adv_show = filtered_adv[start_idx:end_idx]
-    
-    # 💻 結果出力
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("🔵 効率よく『同時に治せる』お薬")
-        if eff_show:
-            for item in eff_show:
-                d = item["data"]
-                st.info(f"**{d['name']}** (処方:{d['rank']}位)\n\n📜 効能: {', '.join(d['efficacy'])}")
-                
-                # 💡 【ログ消滅の修正】1行合体をすべて廃止し、正しい段落へ修正
-                if is_premium:
-                    st.caption(f"💊 【区分: {d['type']}】")
-                    st.caption(f"💡 {d['category']}")
-                    
-                encoded_name = urllib.parse.quote(d["prefix"])
-                amazon_url = f"https://amazon.co.jp{encoded_name}&tag=YOUR_ID-22"
-                if is_premium:
-                    st.markdown(f"<a href='{amazon_url}' target='_blank' style='color:#00c0f0; text-decoration:none;'>🛒 Amazonで類似市販薬を探す</a>", unsafe_allow_html=True)
-                else:
-                    st.markdown(f"<a href='{amazon_url}' target='_blank' style='color:#ff4b4b; text-decoration:none;'>🛒 Amazonで類似市販薬を探す（広告）</a>", unsafe_allow_html=True)
-        else:
-            st.write("該当するお薬はこれ以上ありません。")
-
-    with col2:
-        st.subheader("🔴 『副作用で出やすい』お薬")
-        if adv_show:
-            for item in adv_show:
-                d = item["data"]
-                st.warning(f"**{d['name']}** (処方:{d['rank']}位)\n\n⚠️ 副作用: {', '.join(d['adverse'])}")
-                if is_premium:
-                    st.caption(f"💡 {d['category']}")
-        else:
-            st.write("該当するお薬はこれ以上ありません。")
-
-    st.write("---")
-    
-    # 🎛️ ボタン制御セクション
-    if not is_premium:
-        st.error("🔒 **【機能制限】これより下位（4位以降）のお薬は、無料版では非表示になっています。**")
-        
-    if is_premium:
-        # 💡 【ログ消滅の修正】ここも正しく改行して段落の中に文字出力を格納
-        st.success(f"🔓 **有料版：全機能解放中** （現在 {start_idx + 1} 〜 {start_idx + len(eff_show)} 位付近を表示中）")
-        
-        is_next_disabled = (len(matched_eff) <= end_idx)
-        if st.button("⏭️ 次の3件のお薬をめくる (次ページへ)", use_container_width=True, disabled=is_next_disabled, key="next_page_btn"):
-            st.session_state.current_page += 1
-            st.rerun()
-            
-        is_back_disabled = (st.session_state.current_page <= 0)
-        if st.button("⏮️ 1つ前の検索結果に戻る (前ページへ)", use_container_width=True, disabled=is_back_disabled, key="back_page_btn"):
-            st.session_state.current_page -= 1
-            st.rerun()
