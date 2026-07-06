@@ -2,11 +2,32 @@ import streamlit as st
 import random
 import urllib.parse
 
-# ========================================== # 👇 ここから「初期化コード」を新しく追加します # ========================================== 
-if "seen_eff" not in st.session_state: st.session_state.seen_eff = set() 
-if "seen_adv" not in st.session_state: st.session_state.seen_adv = set() 
-if "saved_premium_status" not in st.session_state: st.session_state.saved_premium_status = "無料版（機能制限あり）"
-# ========================================== # 👆 ここまでを追加 # ==========================================
+# ==========================================
+# 👇 ここから「初期化コード（完全版）」に書き換えてください
+# ==========================================
+if "seen_eff" not in st.session_state:
+    st.session_state.seen_eff = set()
+
+if "seen_adv" not in st.session_state:
+    st.session_state.seen_adv = set()
+
+if "saved_premium_status" not in st.session_state:
+    st.session_state.saved_premium_status = "無料版（機能制限あり）"
+
+if "current_page" not in st.session_state:
+    st.session_state.current_page = 0
+
+if "history_symptoms" not in st.session_state:
+    st.session_state.history_symptoms = set()
+
+if "page_history_stack" not in st.session_state:
+    st.session_state.page_history_stack = []
+
+if "last_selected_symptoms" not in st.session_state:
+    st.session_state.last_selected_symptoms = []
+# ==========================================
+# 👆 ここまでを上書き
+# ==========================================
 
 # =========================================================================
 # 【正真正銘の最終完成版】文字化け・エラーを100%全消滅させた究極のお薬アプリ
