@@ -96,7 +96,6 @@ st.sidebar.header("👑 アプリの購入設定（収益化モデル）")
 user_mode = st.sidebar.radio(
     "アプリのバージョンを選択",
     ["無料版（機能制限あり）", "有料版を購入（480円・全機能解放）"]
-    ["無料版（機能制限あり）", "有料版を購入（480円・全機能解放）"],
     index=0 if st.session_state.saved_premium_status == "無料版（機能制限あり）" else 1
 )
 st.session_state.saved_premium_status = user_mode
