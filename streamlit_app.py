@@ -1,45 +1,3 @@
-Skip to content
-smiry4-jpg
-kusuri-app2
-Repository navigation
-Code
-Issues
-Pull requests
-Agents
-Actions
-Projects
-Wiki
-Security and quality
-Insights
-Settings
-Commit 0d927cc
-smiry4-jpg
-smiry4-jpg
-authored
-yesterday
-Verified
-streamlit_app.py を更新
-main
-1 parent 
-f07a6ad
- commit 
-0d927cc
-1 file changed
-
-+117
--126
-Lines changed: 117 additions & 126 deletions
-File tree
-Filter files…
-streamlit_app.py
-Search within code
- 
-‎streamlit_app.py‎
-+117
--126
-Lines changed: 117 additions & 126 deletions
-Original file line number	Diff line number	Diff line change
-@@ -1,208 +1,199 @@
 import streamlit as st
 import random
 import urllib.parse
@@ -128,6 +86,7 @@ if 'last_selected_symptoms' not in st.session_state: st.session_state.last_selec
 if 'page_history_stack' not in st.session_state: st.session_state.page_history_stack = []
 if 'current_page' not in st.session_state: st.session_state.current_page = 0
 if 'last_age_mode' not in st.session_state: st.session_state.last_age_mode = "👨 大人（15歳以上）"
+
 # 有料版状態の永続記憶メモリ
 if 'saved_premium_status' not in st.session_state: st.session_state.saved_premium_status = "無料版（機能制限あり）"
 
@@ -163,6 +122,7 @@ with st.expander("⚠️ 【重要】ご利用前の免責事項", expanded=Fals
 
 # 👨‍⚕️ 対象者の年齢選択
 st.write("---")
+
 # =========================================================================
 # 👨‍⚕️ 【最上部】年齢の選択ボタン（1番上に完全固定・UI改善）
 # =========================================================================
@@ -179,6 +139,7 @@ if age_mode != st.session_state.last_age_mode:
     st.session_state.history_symptoms = set()
     st.session_state.last_age_mode = age_mode
     st.rerun()
+
 st.write("---")
 
 # 🎛️ 2列配置のチェックボックス方式症状選択
@@ -211,6 +172,7 @@ if selected_symptoms != st.session_state.last_selected_symptoms:
 # 🧠 お薬スキャン＆多重ソート処理の初期化
 matched_eff = []
 matched_adv = []
+
 if selected_symptoms:
     for s in selected_symptoms: st.session_state.history_symptoms.add(s)
 
@@ -326,9 +288,11 @@ if selected_symptoms:
                 for name in last_page["eff"]: st.session_state.seen_eff.remove(name)
                 for name in last_page["adv"]: st.session_state.seen_adv.remove(name)
                 st.rerun()
+
 # --- 🏥 病院検索セクション ---
 st.write("---")
 st.subheader("🗺️ あなたの症状に合わせた「専門病院」ナビ")
+
 recommended_departments = set()
 if st.session_state.history_symptoms:
     for s in st.session_state.history_symptoms:
@@ -336,28 +300,26 @@ if st.session_state.history_symptoms:
         if s in ["発熱", "喉の痛み", "咳"]: recommended_departments.add("内科" if not is_child else "小児科")
         if s in ["鼻炎"]: recommended_departments.add("耳鼻咽喉科")
         if s in ["胃痛", "腹痛"]: recommended_departments.add("消化器内科" if not is_child else "小児科")
+
 dept_list = list(recommended_departments) if recommended_departments else ["内科"]
 dept_text = "、".join(dept_list)
+
 if st.session_state.history_symptoms:
     st.write(f"📊 過去の検索履歴を分析しました。おすすめの診療科： **{dept_text}**")
 else:
     st.write("👉 症状未選択の場合は、一般的な **内科** を案内します。")
+
 primary_dept = dept_list if dept_list else "内科"
+
 # 👑 【成功コードを100%そのまま流用】大成功していたマップ用リンク生成部分です
 encoded_search_word = urllib.parse.quote(f"近くの {primary_dept}")
 google_map_app_url = f"comgooglemaps://?q={encoded_search_word}"
+
 if is_premium:
     st.success(f"📍 有料版機能：下のボタンをタップすると、iPhoneのGoogleマップアプリが【自動で文字が入力された状態】で一発起動します。")
     st.link_button(f"🗺️ 【近くの {primary_dept}】 をマップアプリで検索", google_map_app_url, use_container_width=True)
 else:
     st.error("🔒 **【機能制限】専門病院への「ルート自動案内（Googleマップ連携）」は、有料版限定の機能です。**")
+
 # =========================================================================
 # 🎛️ 【大復活：常設配置】進む・戻るボタンエリア
-0 commit comments
-Comments
-0
- (0)
-Comment
-You're not receiving notifications from this thread.
-
-There are no files selected for viewing
