@@ -250,9 +250,7 @@ if selected_symptoms:
         st.success(f"🔓 **有料版：全機能解放中** （現在 {start_idx + 1} 〜 {start_idx + len(eff_show)} 位付近を表示中）")
         
         is_next_disabled = (len(matched_eff) <= end_idx)
-        if st.button("⏭️ 次の3件のお薬をめくる (次ページへ)", use_container_width=True, disabled=is_next_disabled, key="next_page_btn"):
-            st.session_state.current_page += 1
-        # ⏭️ 進むボタン
+             # ⏭️ 進むボタン
         if st.button("⏭️ 次の3件のお薬をめくる（4位以降を表示）", use_container_width=True):
             # 今見ている3件の名前のリストを「戻る用」のスタックに保存して進む
             st.session_state.page_history_stack.append({
