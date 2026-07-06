@@ -64,7 +64,7 @@ if 'app_db' not in st.session_state:
             "name": f"「{prefix}{random.choice(brand_suffixes)}{form_type}」",
             "prefix": prefix,
             "category": drug_categories.get(prefix, "【一般治療薬】医師が日常的に処方する認可医薬品"),
-            "efficacy": eff, "adverse": adv, "rank": rank, "target": target
+            "efficacy": eff, "adverse": adv, "rank": rank, "target": target,
             "name": unique_drug_name,
             "prefix": template["prefix"],
             "category": template["desc"],
