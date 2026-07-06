@@ -236,15 +236,25 @@ if selected_symptoms:
     st.write("---")
 
     
-    # 🎛️ ボタン制御セクション
-    # 💡 【インデントの完全整列】スペースの数を数式に沿って完全に均一に揃え直しました
+       # 🎛️ 【大復活】進む・戻るボタンエリア
+    # =========================================================================
+    # 🎛 Cetセクション：進むボタン ＆ 【改善点：戻るボタンを追加】
+    # =========================================================================
     if not is_premium:
+        st.error("🔒 **【機能制限】4位以降のより専門的なお薬は、有料版で全機能解放されます。**")
         st.error("🔒 **【機能制限】これより下位（4位以降）のお薬は、無料版では非表示になっています。**")
     else:
         st.success(f"🔓 **有料版：全機能解放中**（現在までに累計 効能:{len(st.session_state.seen_eff)}件 / 副作用:{len(st.session_state.seen_adv)}件 を精査済）")
+
+    if is_premium:
+        st.success(f"🔓 **有料版：全機能解放中** （現在 {start_idx + 1} 〜 {start_idx + len(eff_show)} 位付近を表示中）")
         
+        is_next_disabled = (len(matched_eff) <= end_idx)
+        if st.button("⏭️ 次の3件のお薬をめくる (次ページへ)", use_container_width=True, disabled=is_next_disabled, key="next_page_btn"):
+            st.session_state.current_page += 1
         # ⏭️ 進むボタン
         if st.button("⏭️ 次の3件のお薬をめくる（4位以降を表示）", use_container_width=True):
+            # 今見ている3件の名前のリストを「戻る用」のスタックに保存して進む
             st.session_state.page_history_stack.append({
                 "eff": [item["data"]["name"] for item in eff_show],
                 "adv": [item["data"]["name"] for item in adv_show]
@@ -252,8 +262,9 @@ if selected_symptoms:
             for item in eff_show: st.session_state.seen_eff.add(item["data"]["name"])
             for item in adv_show: st.session_state.seen_adv.add(item["data"]["name"])
             st.rerun()
-            
-        # ⏮️ 戻るボタン
+
+        is_back_disabled = (st.session_state.current_page <= 0)
+        # ⏮️ 【追加機能】戻るボタン（記憶スタックに過去データがある時だけ出現）
         if len(st.session_state.page_history_stack) > 0:
             if st.button("⏮️ 1つ前の検索結果に戻る", use_container_width=True):
                 last_page = st.session_state.page_history_stack.pop()
