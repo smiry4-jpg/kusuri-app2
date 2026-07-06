@@ -2,6 +2,12 @@ import streamlit as st
 import random
 import urllib.parse
 
+# ========================================== # 👇 ここから「初期化コード」を新しく追加します # ========================================== 
+if "seen_eff" not in st.session_state: st.session_state.seen_eff = set() 
+if "seen_adv" not in st.session_state: st.session_state.seen_adv = set() 
+if "saved_premium_status" not in st.session_state: st.session_state.saved_premium_status = "無料版（機能制限あり）"
+# ========================================== # 👆 ここまでを追加 # ==========================================
+
 # =========================================================================
 # 【正真正銘の最終完成版】文字化け・エラーを100%全消滅させた究極のお薬アプリ
 # 【完全解放・大成功版】課金ロックを全撤廃！すべての神機能が最初から100%出現するアプリ
