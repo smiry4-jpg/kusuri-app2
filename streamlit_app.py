@@ -226,7 +226,18 @@ if selected_symptoms or search_query:
             keyword_count = sum(1 for s in selected_symptoms if s in drug["efficacy"])
             keyword_count_adv = sum(1 for s in selected_symptoms if s in drug["adverse"])
 
-@@ -197,66 +211,52 @@
+            if keyword_count > 0 and drug["id"] not in seen_ids_eff:
+                matched_eff.append({"data": drug, "count": keyword_count})
+                seen_ids_eff.add(drug["id"])
+
+            if keyword_count_adv > 0 and drug["id"] not in seen_ids_adv:
+                matched_adv.append({"data": drug, "count": keyword_count_adv})
+                seen_ids_adv.add(drug["id"])
+        else:
+            # 名前検索のみの場合
+            if drug["id"] not in seen_ids_eff:
+                matched_eff.append({"data": drug, "count": 1})
+                seen_ids_eff.add(drug["id"])
             if drug["id"] not in seen_ids_adv:
                 matched_adv.append({"data": drug, "count": 1})
                 seen_ids_adv.add(drug["id"])
@@ -295,4 +306,3 @@ if selected_symptoms or search_query:
         
     if is_premium:
         st.success(f"🔓 **有料版：全機能解放中** （現在 {start_idx + 1} 〜 {start_idx + len(eff_show)} 位付近を表示中）")
-        
