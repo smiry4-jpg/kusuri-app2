@@ -194,7 +194,6 @@ with col_right:
 
 
 # ページリセット回路（安全に連動）
-if search_query != st.session_state.last_search_query:
 # 💡【バグ①修正：1位リスタート回路】
 # 症状のチェック状態、または名前検索ワードが1つ前と変わった瞬間を正確に検知し、ページ数を「0（1位）」に自動リセットします
 if selected_symptoms != st.session_state.last_selected_symptoms or search_query != st.session_state.last_search_query:
